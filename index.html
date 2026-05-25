@@ -539,13 +539,34 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    /* ============ Utility google.script.run -> Promise ============ */
-    function gscript(fn) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      return new Promise(function (resolve, reject) {
-        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
-        runner[fn].apply(runner, args);
-      });
+    /* ============ Backend Apps Script (web app) ============ */
+    // Incolla qui l'URL della tua web app Apps Script (Distribuisci -> App web).
+    var SCRIPT_URL = 'INCOLLA_QUI_URL_WEBAPP';
+
+    function apiGet(params) {
+      var qs = Object.keys(params).map(function (k) {
+        return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+      }).join('&');
+      return fetch(SCRIPT_URL + '?' + qs)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data && data.error) throw new Error(data.error);
+          return data;
+        });
+    }
+
+    function apiPost(payload) {
+      // Content-Type "text/plain" evita la preflight CORS (Apps Script non risponde a OPTIONS).
+      return fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data && data.error) throw new Error(data.error);
+          return data;
+        });
     }
 
     function el(id) { return document.getElementById(id); }
@@ -579,7 +600,11 @@
 
     /* ============ Init dati ============ */
     document.addEventListener('DOMContentLoaded', function () {
-      gscript('getInitData').then(function (data) {
+      if (SCRIPT_URL.indexOf('INCOLLA') !== -1) {
+        toast('Configura SCRIPT_URL in index.html', 'warning');
+        return;
+      }
+      apiGet({ action: 'init' }).then(function (data) {
         fillSelect('stabilimento', data.stabilimenti);
         fillSelect('causale', data.causali);
         fillOperatori(data.operatori);
@@ -642,17 +667,20 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Salvataggio…';
 
-      gscript('registraScarto', {
-        articolo: articolo, variante: variante, quantita: quantita,
-        stabilimento: stabilimento, operatore: operatore, causale: causale
+      apiPost({
+        action: 'registra',
+        data: {
+          articolo: articolo, variante: variante, quantita: quantita,
+          stabilimento: stabilimento, operatore: operatore, causale: causale
+        }
       }).then(function () {
         if (navigator.vibrate) navigator.vibrate(100);
         showSuccess();
         resetForm();
         kpiLoadedOnce = false; // forza ricalcolo KPI al prossimo accesso
-        return gscript('getOperatori');
-      }).then(function (operatori) {
-        if (operatori) fillOperatori(operatori);
+        return apiGet({ action: 'init' });
+      }).then(function (data) {
+        if (data && data.operatori) fillOperatori(data.operatori);
       }).catch(function (err) {
         toast((err && err.message) || 'Errore durante il salvataggio', 'error');
       }).finally(function () {
@@ -998,7 +1026,7 @@
       el('kpiEmpty').className = 'empty-state';
       el('kpiEmpty').textContent = 'Caricamento…';
 
-      gscript('getKpiPareto', range.startMs, range.endMs).then(function (data) {
+      apiGet({ action: 'kpi', start: range.startMs, end: range.endMs }).then(function (data) {
         renderPareto(data);
       }).catch(function (e) {
         console.error(e);

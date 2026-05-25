@@ -1,6 +1,7 @@
 /**
  * Registro Scarti - Berloni Bagno
- * Web app Google Apps Script per la registrazione degli scarti di produzione.
+ * Backend API (JSON) per Google Apps Script.
+ * Il frontend (index.html) è ospitato su GitHub Pages e chiama questa web app via fetch().
  *
  * Foglio "Base dati":  A Data | B Stabilimento | C Articolo | D Variante |
  *                      E Quantità | F Causale | G Operatore | H Registrato su Essentia
@@ -12,32 +13,55 @@ var SHEET_DATI = 'Base dati';
 var SHEET_CAUSALI = 'Causali';
 var STABILIMENTI = ['BB3', 'Ipiemme'];
 
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('Registro Scarti')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
-    .addMetaTag('theme-color', '#E79E2F')
-    .addMetaTag('apple-mobile-web-app-capable', 'yes')
-    .addMetaTag('apple-mobile-web-app-status-bar-style', 'default')
-    .addMetaTag('apple-mobile-web-app-title', 'Scarti')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+/* ============================ ROUTING API ============================ */
+
+/** Letture: ?action=init  oppure  ?action=kpi&start=<ms>&end=<ms> */
+function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) || '';
+  try {
+    if (action === 'init') return json_(getInitData());
+    if (action === 'kpi') {
+      return json_(getKpiPareto(Number(e.parameter.start), Number(e.parameter.end)));
+    }
+    return json_({ error: 'Azione non valida' });
+  } catch (err) {
+    return json_({ error: (err && err.message) || String(err) });
+  }
+}
+
+/** Scritture: body JSON { action: 'registra', data: {...} } */
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+    if (body.action === 'registra') return json_(registraScarto(body.data || {}));
+    return json_({ error: 'Azione non valida' });
+  } catch (err) {
+    return json_({ error: (err && err.message) || String(err) });
+  }
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function ss_() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
 
+/* ============================ LETTURE ============================ */
+
 /** Dati iniziali per popolare i menu a tendina. */
 function getInitData() {
   return {
     stabilimenti: STABILIMENTI,
-    causali: getCausali(),
-    operatori: getOperatori()
+    causali: getCausali_(),
+    operatori: getOperatori_()
   };
 }
 
 /** Valori della colonna B "Causale" del foglio "Causali" (ordine del foglio, senza duplicati). */
-function getCausali() {
+function getCausali_() {
   var sheet = ss_().getSheetByName(SHEET_CAUSALI);
   var last = sheet.getLastRow();
   if (last < 2) return [];
@@ -51,7 +75,7 @@ function getCausali() {
 }
 
 /** Operatori già presenti nel file (colonna G di "Base dati"), distinti e ordinati alfabeticamente. */
-function getOperatori() {
+function getOperatori_() {
   var sheet = ss_().getSheetByName(SHEET_DATI);
   var last = sheet.getLastRow();
   if (last < 2) return [];
@@ -81,6 +105,42 @@ function getCausaliSigla_() {
   }
   return map;
 }
+
+/**
+ * Aggrega le quantità per causale nell'intervallo richiesto (Pareto, ordinato decrescente).
+ * @param {number} startMs epoch ms inizio intervallo (incluso)
+ * @param {number} endMs   epoch ms fine intervallo (incluso)
+ */
+function getKpiPareto(startMs, endMs) {
+  var sheet = ss_().getSheetByName(SHEET_DATI);
+  var last = sheet.getLastRow();
+  if (last < 2) return { rows: [], total: 0 };
+
+  var values = sheet.getRange(2, 1, last - 1, 6).getValues(); // A..F
+  var map = {};
+  for (var i = 0; i < values.length; i++) {
+    var d = values[i][0];
+    if (!(d instanceof Date)) continue;
+    var t = d.getTime();
+    if (t < startMs || t > endMs) continue;
+    var causale = (values[i][5] || '').toString().trim();
+    if (!causale) continue;
+    var q = Number(values[i][4]) || 0;
+    map[causale] = (map[causale] || 0) + q;
+  }
+
+  var siglaMap = getCausaliSigla_();
+  var rows = [];
+  var total = 0;
+  for (var k in map) {
+    rows.push({ causale: k, sigla: siglaMap[k] || k, quantita: map[k] });
+    total += map[k];
+  }
+  rows.sort(function (a, b) { return b.quantita - a.quantita; });
+  return { rows: rows, total: total };
+}
+
+/* ============================ SCRITTURE ============================ */
 
 /**
  * Registra un nuovo scarto in fondo al foglio "Base dati".
@@ -116,38 +176,4 @@ function registraScarto(data) {
   sheet.getRange(r, 4).setValue(variante);
 
   return { ok: true, articolo: articolo, variante: variante, quantita: quantita };
-}
-
-/**
- * Aggrega le quantità per causale nell'intervallo richiesto (Pareto, ordinato decrescente).
- * @param {number} startMs epoch ms inizio intervallo (incluso)
- * @param {number} endMs   epoch ms fine intervallo (incluso)
- */
-function getKpiPareto(startMs, endMs) {
-  var sheet = ss_().getSheetByName(SHEET_DATI);
-  var last = sheet.getLastRow();
-  if (last < 2) return { rows: [], total: 0 };
-
-  var values = sheet.getRange(2, 1, last - 1, 6).getValues(); // A..F
-  var map = {};
-  for (var i = 0; i < values.length; i++) {
-    var d = values[i][0];
-    if (!(d instanceof Date)) continue;
-    var t = d.getTime();
-    if (t < startMs || t > endMs) continue;
-    var causale = (values[i][5] || '').toString().trim();
-    if (!causale) continue;
-    var q = Number(values[i][4]) || 0;
-    map[causale] = (map[causale] || 0) + q;
-  }
-
-  var siglaMap = getCausaliSigla_();
-  var rows = [];
-  var total = 0;
-  for (var k in map) {
-    rows.push({ causale: k, sigla: siglaMap[k] || k, quantita: map[k] });
-    total += map[k];
-  }
-  rows.sort(function (a, b) { return b.quantita - a.quantita; });
-  return { rows: rows, total: total };
 }
