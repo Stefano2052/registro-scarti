@@ -1,0 +1,14 @@
+{
+  "name": "Registro Scarti",
+  "short_name": "Scarti",
+  "description": "Registro degli scarti di produzione - Berloni Bagno",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F7F5F2",
+  "theme_color": "#E79E2F",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

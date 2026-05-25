@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#E79E2F">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Scarti">
+  <title>Registro Scarti</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;800&display=swap" rel="stylesheet">
+
+  <!-- ZXing caricato upfront (fallback CDN gestito via JS) -->
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <!-- Chart.js per il grafico di Pareto -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #E79E2F;
+      --primary-dark: #C9831F;
+      --secondary: #A8A29E;
+      --background: #F7F5F2;
+      --surface: #FFFFFF;
+      --border: #E5E2DE;
+      --text-primary: #2F2F2F;
+      --text-secondary: #6F6F6F;
+      --shadow-soft: 0 6px 18px rgba(47, 47, 47, 0.08);
+      --shadow-focus: 0 0 0 3px rgba(231, 158, 47, 0.18);
+      --success-bg: #F7EBD8;
+      --success-text: #8A5A16;
+      --info-bg: #F3EFE8;
+      --info-text: #6F6F6F;
+      --error-bg: #F9E3E0;
+      --error-text: #9B4A43;
+      --selected-bg: #FCF3E3;
+      --hover-row: #FBF9F6;
+      --section-bg: #F5F1EA;
+      --radius: 16px;
+      --radius-sm: 12px;
+      --transition: 0.2s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--background);
+      color: var(--text-primary);
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ===== Header ===== */
+    .app-header {
+      background: var(--surface);
+      color: var(--text-primary);
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    @media (min-width: 480px) { .app-header { padding: 14px 20px; } }
+    .app-header h1 { font-size: 26px; font-weight: 400; }
+    .app-header h1 strong { font-weight: 800; }
+    .app-header .app-name {
+      font-family: 'Nunito', Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      line-height: 1.2;
+      text-align: right;
+    }
+    .app-header .app-name strong { font-weight: 800; }
+
+    /* ===== Layout ===== */
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px 16px 100px;
+    }
+    @media (min-width: 480px) { .container { padding: 20px 20px 100px; } }
+
+    /* ===== Tab navigazione ===== */
+    .nav-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .nav-tab {
+      flex: 1;
+      min-height: 46px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .nav-tab:hover { background: var(--hover-row); }
+    .nav-tab:active { background: var(--selected-bg); }
+    .nav-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* ===== Card ===== */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel { animation: fadeIn 0.3s ease; }
+    .panel[hidden] { display: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== Form ===== */
+    .field-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+    .field-group label {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .field-group input, .field-group select {
+      width: 100%;
+      padding: 12px 14px;
+      min-height: 48px;
+      font-size: 16px;
+      font-family: Arial, sans-serif;
+      color: var(--text-primary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      appearance: none;
+      -webkit-appearance: none;
+      transition: var(--transition);
+    }
+    .field-group select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6F6F' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 40px;
+    }
+    .field-group input:focus, .field-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: var(--shadow-focus);
+    }
+    .field-group input.scanned {
+      border-color: var(--primary);
+      background: var(--selected-bg);
+    }
+
+    .scan-row { display: flex; gap: 8px; align-items: stretch; }
+    .scan-row input { flex: 1; }
+    .btn-scan {
+      width: 48px;
+      min-width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-scan:hover { background: var(--primary-dark); }
+    .btn-scan:active { transform: translateY(1px); }
+    .btn-scan:disabled { opacity: 0.5; }
+
+    .scanned-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--success-text);
+    }
+    .scan-debug {
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      min-height: 14px;
+      word-break: break-all;
+    }
+    .scan-debug.active { color: var(--success-text); }
+    .scan-debug.warn { color: var(--primary-dark); }
+    .scan-debug:empty { display: none; }
+
+    /* ===== Pulsanti ===== */
+    .btn-primary, .btn-reset {
+      width: 100%;
+      padding: 14px 16px;
+      min-height: 50px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: Arial, sans-serif;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: var(--transition);
+    }
+    .btn-primary { background: var(--primary); color: #fff; border: none; margin-top: 4px; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-primary:disabled, .btn-reset:disabled { opacity: 0.5; }
+    .btn-reset {
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      margin-top: 8px;
+    }
+    .btn-reset:hover { background: var(--hover-row); }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.5);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== KPI / periodo ===== */
+    .period-wrap { position: relative; margin-bottom: 14px; }
+    .period-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--section-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .period-btn:hover { background: var(--hover-row); }
+    .period-btn .caret { color: var(--text-secondary); }
+    .period-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 50;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      min-width: 200px;
+    }
+    .period-menu[hidden] { display: none; }
+    .period-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 12px 14px;
+      background: none;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .period-menu button:hover { background: var(--hover-row); }
+    .period-menu button.sel { background: var(--selected-bg); color: var(--primary-dark); }
+    .custom-panel {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .custom-panel[hidden] { display: none; }
+    .custom-panel label { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+    .custom-panel input {
+      width: 100%; padding: 10px 12px; font-size: 16px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+    }
+    .custom-panel .btn-apply {
+      background: var(--primary); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 10px; font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+
+    .kpi-total { margin-bottom: 12px; }
+    .kpi-total .num { font-size: 28px; font-weight: 800; color: var(--primary); }
+    .kpi-total .lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+
+    .chart-box { position: relative; height: 340px; }
+    .chart-box[hidden] { display: none; }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 28px 20px;
+      font-size: 14px;
+    }
+    .empty-state[hidden] { display: none; }
+    .empty-state.error { color: var(--error-text); }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      max-width: 90%;
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: var(--shadow-soft);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 200;
+      transition: opacity var(--transition), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success, .toast.warning { background: var(--success-bg); border: 1px solid var(--primary); color: var(--success-text); }
+    .toast.error { background: var(--error-bg); color: var(--error-text); }
+    .toast.info { background: var(--info-bg); color: var(--info-text); }
+
+    /* ===== Overlay successo ===== */
+    .success-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300;
+      opacity: 0; pointer-events: none;
+      transition: opacity var(--transition);
+    }
+    .success-overlay.show { opacity: 1; pointer-events: auto; }
+    .success-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      transform: scale(0.85);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .success-overlay.show .success-card { transform: scale(1); }
+    .success-circle {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: #2ecc71;
+      margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .success-title { font-size: 20px; font-weight: 800; }
+
+    /* ===== Scanner live (Quagga) ===== */
+    .scanner-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .scanner-box { width: 100%; max-width: 480px; background: #000; border-radius: var(--radius); overflow: hidden; }
+    .scanner-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; color: #fff; font-size: 14px; font-weight: 700; background: rgba(0,0,0,0.6);
+    }
+    .scanner-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+    .scanner-viewport { position: relative; width: 100%; }
+    .scanner-viewport video, .scanner-viewport canvas { width: 100% !important; height: auto !important; display: block; }
+  </style>
+</head>
+<body>
+  <div class="app-header">
+    <h1><strong>Berloni</strong> Bagno</h1>
+    <span class="app-name"><strong>Registro</strong><br>Scarti</span>
+  </div>
+
+  <div class="container">
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tabRegistraBtn" onclick="switchTab('registra')">Registra</button>
+      <button class="nav-tab" id="tabKpiBtn" onclick="switchTab('kpi')">KPI</button>
+    </div>
+
+    <!-- ===== Panel Registra ===== -->
+    <section class="panel" id="panelRegistra">
+      <div class="card">
+        <div class="card-title">Registra scarto</div>
+
+        <div class="field-group">
+          <label>Articolo <span class="scanned-badge" id="scanBadge" style="display:none">✅ scansionato</span></label>
+          <div class="scan-row">
+            <input type="text" id="articolo" inputmode="text" autocomplete="off" maxlength="13" placeholder="Codice articolo (13 caratteri)">
+            <button class="btn-scan" id="btnScan" onclick="startScan()" aria-label="Scansiona codice a barre">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </button>
+          </div>
+          <div class="scan-debug" id="scanDebug"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="variante">Variante</label>
+          <input type="text" id="variante" inputmode="numeric" autocomplete="off" placeholder="Es. 202">
+        </div>
+
+        <div class="field-group">
+          <label for="quantita">Quantità (pezzi)</label>
+          <input type="number" id="quantita" inputmode="numeric" min="1" step="1" placeholder="Es. 5">
+        </div>
+
+        <div class="field-group">
+          <label for="stabilimento">Stabilimento</label>
+          <select id="stabilimento">
+            <option value="">— Seleziona —</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="operatore">Operatore</label>
+          <select id="operatore" onchange="onOperatoreChange()">
+            <option value="">— Seleziona —</option>
+          </select>
+          <input type="text" id="nuovoOperatore" autocomplete="off" placeholder="Nome nuovo operatore" style="display:none">
+        </div>
+
+        <div class="field-group">
+          <label for="causale">Causale</label>
+          <select id="causale">
+            <option value="">— Seleziona —</option>
+          </select>
+        </div>
+
+        <button class="btn-primary" id="btnSalva" onclick="salva()">Salva scarto</button>
+        <button class="btn-reset" id="btnReset" onclick="resetForm()">Pulisci</button>
+      </div>
+    </section>
+
+    <!-- ===== Panel KPI ===== -->
+    <section class="panel" id="panelKpi" hidden>
+      <div class="card">
+        <div class="card-title">Pareto scarti per causale</div>
+
+        <div class="period-wrap">
+          <button class="period-btn" id="periodBtn" onclick="togglePeriodMenu()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span id="periodLabel">Ultimo mese</span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="period-menu" id="periodMenu" hidden>
+            <button data-type="anno" onclick="selectPeriod('anno')">Ultimo anno</button>
+            <button data-type="mese" class="sel" onclick="selectPeriod('mese')">Ultimo mese</button>
+            <button data-type="settimana" onclick="selectPeriod('settimana')">Ultima settimana</button>
+            <button data-type="custom" onclick="selectPeriod('custom')">Personalizza…</button>
+            <div class="custom-panel" id="customPanel" hidden>
+              <div>
+                <label for="customStart">Dal</label>
+                <input type="date" id="customStart">
+              </div>
+              <div>
+                <label for="customEnd">Al</label>
+                <input type="date" id="customEnd">
+              </div>
+              <button class="btn-apply" onclick="applyCustom()">Applica</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kpi-total" id="kpiTotal" hidden>
+          <div class="num" id="kpiTotalNum">0</div>
+          <div class="lbl">Pezzi scartati nel periodo</div>
+        </div>
+
+        <div class="chart-box" id="chartBox" hidden>
+          <canvas id="paretoChart"></canvas>
+        </div>
+        <div class="empty-state" id="kpiEmpty">Caricamento…</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Input fotocamera (capture posteriore) -->
+  <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="processPhotoFile(this)">
+
+  <!-- Scanner live (solo se BarcodeDetector non disponibile e Quagga2 carica) -->
+  <div class="scanner-overlay" id="scannerOverlay">
+    <div class="scanner-box">
+      <div class="scanner-head">
+        <span>Inquadra il codice a barre</span>
+        <button class="scanner-close" onclick="stopLiveScanner()" aria-label="Chiudi">✕</button>
+      </div>
+      <div class="scanner-viewport" id="scannerViewport"></div>
+    </div>
+  </div>
+
+  <!-- Overlay successo -->
+  <div class="success-overlay" id="successOverlay">
+    <div class="success-card">
+      <div class="success-circle">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="success-title">Scarto registrato</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* ============ Utility google.script.run -> Promise ============ */
+    function gscript(fn) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function (resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fn].apply(runner, args);
+      });
+    }
+
+    function el(id) { return document.getElementById(id); }
+    function val(id) { var e = el(id); return e ? e.value : ''; }
+
+    /* ============ Toast / overlay ============ */
+    var toastTimer = null;
+    function toast(msg, type) {
+      var t = el('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (type || 'info');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.className = 'toast ' + (type || 'info'); }, 2800);
+    }
+    function showSuccess() {
+      var o = el('successOverlay');
+      o.classList.add('show');
+      setTimeout(function () { o.classList.remove('show'); }, 1400);
+    }
+
+    /* ============ Tab ============ */
+    var kpiLoadedOnce = false;
+    function switchTab(name) {
+      var isReg = name === 'registra';
+      el('tabRegistraBtn').classList.toggle('active', isReg);
+      el('tabKpiBtn').classList.toggle('active', !isReg);
+      el('panelRegistra').hidden = !isReg;
+      el('panelKpi').hidden = isReg;
+      if (!isReg && !kpiLoadedOnce) { kpiLoadedOnce = true; loadKpi(); }
+    }
+
+    /* ============ Init dati ============ */
+    document.addEventListener('DOMContentLoaded', function () {
+      gscript('getInitData').then(function (data) {
+        fillSelect('stabilimento', data.stabilimenti);
+        fillSelect('causale', data.causali);
+        fillOperatori(data.operatori);
+      }).catch(function (e) {
+        toast('Errore nel caricamento dei dati', 'error');
+        console.error(e);
+      });
+    });
+
+    function fillSelect(id, items) {
+      var sel = el(id);
+      sel.length = 1; // mantiene il placeholder
+      (items || []).forEach(function (v) {
+        var o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        sel.appendChild(o);
+      });
+    }
+
+    function fillOperatori(items) {
+      var sel = el('operatore');
+      sel.length = 1;
+      (items || []).forEach(function (v) {
+        var o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        sel.appendChild(o);
+      });
+      var nuovo = document.createElement('option');
+      nuovo.value = '__new__';
+      nuovo.textContent = '➕ Aggiungi nuovo operatore…';
+      sel.appendChild(nuovo);
+    }
+
+    function onOperatoreChange() {
+      var isNew = val('operatore') === '__new__';
+      var inp = el('nuovoOperatore');
+      inp.style.display = isNew ? 'block' : 'none';
+      if (isNew) { inp.value = ''; inp.focus(); }
+    }
+
+    /* ============ Salvataggio ============ */
+    function salva() {
+      var articolo = val('articolo').trim();
+      var variante = val('variante').trim();
+      var quantitaStr = val('quantita').trim();
+      var stabilimento = val('stabilimento');
+      var operatore = val('operatore');
+      if (operatore === '__new__') operatore = val('nuovoOperatore').trim();
+      var causale = val('causale');
+
+      if (articolo.length !== 13) { toast('Il codice articolo deve avere 13 caratteri.', 'warning'); el('articolo').focus(); return; }
+      if (!/^\d+$/.test(variante)) { toast('La variante deve essere solo numerica.', 'warning'); el('variante').focus(); return; }
+      var quantita = Number(quantitaStr);
+      if (!quantita || quantita <= 0) { toast('Inserisci una quantità valida.', 'warning'); el('quantita').focus(); return; }
+      if (!stabilimento) { toast('Seleziona lo stabilimento.', 'warning'); return; }
+      if (!operatore) { toast('Seleziona o inserisci l\'operatore.', 'warning'); return; }
+      if (!causale) { toast('Seleziona la causale.', 'warning'); return; }
+
+      var btn = el('btnSalva');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Salvataggio…';
+
+      gscript('registraScarto', {
+        articolo: articolo, variante: variante, quantita: quantita,
+        stabilimento: stabilimento, operatore: operatore, causale: causale
+      }).then(function () {
+        if (navigator.vibrate) navigator.vibrate(100);
+        showSuccess();
+        resetForm();
+        kpiLoadedOnce = false; // forza ricalcolo KPI al prossimo accesso
+        return gscript('getOperatori');
+      }).then(function (operatori) {
+        if (operatori) fillOperatori(operatori);
+      }).catch(function (err) {
+        toast((err && err.message) || 'Errore durante il salvataggio', 'error');
+      }).finally(function () {
+        btn.disabled = false;
+        btn.textContent = 'Salva scarto';
+      });
+    }
+
+    function resetForm() {
+      ['articolo', 'variante', 'quantita', 'nuovoOperatore'].forEach(function (id) { el(id).value = ''; });
+      ['stabilimento', 'operatore', 'causale'].forEach(function (id) { el(id).selectedIndex = 0; });
+      el('nuovoOperatore').style.display = 'none';
+      clearScanned();
+      setDebug('');
+    }
+
+    function markScanned() {
+      el('articolo').classList.add('scanned');
+      el('variante').classList.add('scanned');
+      el('scanBadge').style.display = 'inline';
+    }
+    function clearScanned() {
+      el('articolo').classList.remove('scanned');
+      el('variante').classList.remove('scanned');
+      el('scanBadge').style.display = 'none';
+    }
+    function setDebug(msg, cls) {
+      var d = el('scanDebug');
+      d.textContent = msg || '';
+      d.className = 'scan-debug' + (cls ? ' ' + cls : '');
+    }
+
+    /* ============ Scanner: caricamento librerie ============ */
+    function loadScript(src) {
+      return new Promise(function (res, rej) {
+        var s = document.createElement('script');
+        s.src = src; s.onload = res;
+        s.onerror = function () { rej(new Error('load ' + src)); };
+        document.head.appendChild(s);
+      });
+    }
+    function ensureZXing() {
+      if (window.ZXing) return Promise.resolve(true);
+      return loadScript('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js')
+        .then(function () { return !!window.ZXing; })
+        .catch(function () { return !!window.ZXing; });
+    }
+    function ensureQuagga() {
+      if (window.Quagga) return Promise.resolve(true);
+      return loadScript('https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js')
+        .then(function () { return !!window.Quagga; })
+        .catch(function () { return !!window.Quagga; });
+    }
+
+    /* ============ Scanner: avvio ============ */
+    function startScan() {
+      if ('BarcodeDetector' in window) { openPhotoCapture(); return; }
+      ensureQuagga().then(function (ok) {
+        if (ok) startLiveScanner(); else openPhotoCapture();
+      });
+    }
+    function openPhotoCapture() {
+      var inp = el('photoInput');
+      inp.value = '';
+      inp.click();
+    }
+
+    /* ============ Scanner: live (Quagga2) ============ */
+    function onQuaggaDetected(result) {
+      var code = result && result.codeResult && result.codeResult.code;
+      if (!code) return;
+      if (navigator.vibrate) navigator.vibrate(100);
+      stopLiveScanner();
+      handleScannedCode(code);
+    }
+    function startLiveScanner() {
+      var overlay = el('scannerOverlay');
+      var viewport = el('scannerViewport');
+      overlay.style.display = 'flex';
+      Quagga.init({
+        inputStream: {
+          name: 'Live', type: 'LiveStream', target: viewport,
+          constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        },
+        decoder: { readers: ['code_128_reader'], multiple: false },
+        locate: true, numOfWorkers: 0
+      }, function (err) {
+        if (err) {
+          console.error(err);
+          stopLiveScanner();
+          toast('Fotocamera non disponibile', 'error');
+          openPhotoCapture();
+          return;
+        }
+        Quagga.start();
+      });
+      Quagga.onDetected(onQuaggaDetected);
+    }
+    function stopLiveScanner() {
+      try { Quagga.offDetected(onQuaggaDetected); Quagga.stop(); } catch (e) {}
+      el('scannerOverlay').style.display = 'none';
+      el('scannerViewport').innerHTML = '';
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && window.Quagga) { try { Quagga.stop(); } catch (e) {} }
+    });
+
+    /* ============ Scanner: da foto ============ */
+    function processPhotoFile(input) {
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!file) return;
+      var btn = el('btnScan');
+      btn.disabled = true;
+      setDebug('Lettura codice a barre…');
+      decodeBarcode(file).then(function (code) {
+        if (code) {
+          handleScannedCode(code);
+        } else {
+          toast('Codice non trovato — riprova', 'warning');
+          setDebug('Codice non trovato — riprova', 'warn');
+        }
+      }).catch(function (e) {
+        console.error(e);
+        toast('Errore durante la scansione — riprova', 'error');
+        setDebug('Errore durante la scansione', 'warn');
+      }).finally(function () { btn.disabled = false; });
+    }
+
+    function handleScannedCode(raw) {
+      var code = (raw || '').toString().trim();
+      var idx = code.indexOf('/');
+      if (idx <= 0 || idx >= code.length - 1) {
+        toast('Codice non riconosciuto — riprova', 'warning');
+        setDebug('Letto "' + code + '" ma manca il separatore "/"', 'warn');
+        return false;
+      }
+      var articolo = code.slice(0, idx).trim();
+      var variante = code.slice(idx + 1).trim();
+      el('articolo').value = articolo;
+      el('variante').value = variante;
+      markScanned();
+      setDebug('Letto: ' + articolo + ' / ' + variante, 'active');
+      if (navigator.vibrate) navigator.vibrate(100);
+      toast('Codice letto', 'success');
+      return true;
+    }
+
+    /* ============ Decodifica immagine ============ */
+    function fileToCanvas(file) {
+      return new Promise(function (resolve, reject) {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var max = 2560;
+          if (w > max || h > max) {
+            var s = Math.min(max / w, max / h);
+            w = Math.round(w * s); h = Math.round(h * s);
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Immagine non leggibile')); };
+        img.src = url;
+      });
+    }
+
+    function rotateCanvas(src, deg) {
+      if (deg % 360 === 0) return src;
+      var rad = deg * Math.PI / 180;
+      var sin = Math.abs(Math.sin(rad)), cos = Math.abs(Math.cos(rad));
+      var w = src.width, h = src.height;
+      var nw = Math.floor(w * cos + h * sin), nh = Math.floor(w * sin + h * cos);
+      var c = document.createElement('canvas');
+      c.width = nw; c.height = nh;
+      var ctx = c.getContext('2d');
+      ctx.translate(nw / 2, nh / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(src, -w / 2, -h / 2);
+      return c;
+    }
+
+    function enhancedCanvas(src) {
+      var c = document.createElement('canvas');
+      c.width = src.width; c.height = src.height;
+      var ctx = c.getContext('2d');
+      ctx.filter = 'grayscale(1) contrast(2.2) brightness(0.85)';
+      ctx.drawImage(src, 0, 0);
+      return c;
+    }
+
+    // Step 1 - BarcodeDetector nativo
+    function detectNative(source) {
+      if (!('BarcodeDetector' in window)) return Promise.resolve(null);
+      try {
+        var bd = new BarcodeDetector({ formats: ['code_128'] });
+        return bd.detect(source).then(function (res) {
+          return (res && res.length) ? res[0].rawValue : null;
+        }).catch(function () { return null; });
+      } catch (e) { return Promise.resolve(null); }
+    }
+
+    // Step 2 - ZXing (6 rotazioni: 0, 30, 60, 90, 120, 150)
+    function detectZXing(canvas) {
+      if (!window.ZXing) return null;
+      try {
+        var hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        var reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        var angles = [0, 30, 60, 90, 120, 150];
+        for (var i = 0; i < angles.length; i++) {
+          var rc = rotateCanvas(canvas, angles[i]);
+          try {
+            var source = new ZXing.HTMLCanvasElementLuminanceSource(rc);
+            var bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+            var result = reader.decode(bitmap, hints);
+            if (result) return result.getText ? result.getText() : (result.text || null);
+          } catch (e) {
+            /* nessun codice in questa rotazione, prova la successiva */
+          } finally {
+            try { reader.reset(); } catch (e2) {}
+          }
+        }
+      } catch (e) { console.warn('ZXing', e); }
+      return null;
+    }
+
+    // Step 3 - Quagga2 (3 tentativi in cascata)
+    function quaggaDecode(src) {
+      return new Promise(function (resolve) {
+        try {
+          Quagga.decodeSingle({
+            src: src, numOfWorkers: 0, locate: true,
+            inputStream: { size: 2048 },
+            decoder: { readers: ['code_128_reader'] }
+          }, function (result) {
+            if (result && result.codeResult && result.codeResult.code) resolve(result.codeResult.code);
+            else resolve(null);
+          });
+        } catch (e) { resolve(null); }
+      });
+    }
+    function detectQuagga(file, canvas) {
+      return ensureQuagga().then(function (ok) {
+        if (!ok || !window.Quagga) return null;
+        return quaggaDecode(URL.createObjectURL(file)).then(function (code) {
+          if (code) return code;
+          return quaggaDecode(canvas.toDataURL('image/jpeg', 0.92));
+        }).then(function (code) {
+          if (code) return code;
+          return quaggaDecode(enhancedCanvas(canvas).toDataURL('image/jpeg', 0.92));
+        });
+      });
+    }
+
+    function decodeBarcode(file) {
+      var canvasRef = null;
+      return fileToCanvas(file).then(function (canvas) {
+        canvasRef = canvas;
+        return detectNative(canvas);                 // Step 1
+      }).then(function (code) {
+        if (code) return code;
+        setDebug('Analisi immagine…');
+        return ensureZXing().then(function () { return detectZXing(canvasRef); }); // Step 2
+      }).then(function (code) {
+        if (code) return code;
+        return detectQuagga(file, canvasRef);         // Step 3
+      });
+    }
+
+    /* ============ KPI / Pareto ============ */
+    var paretoChart = null;
+    var kpiRows = [];
+    var currentPeriod = 'mese';
+
+    function togglePeriodMenu() {
+      var m = el('periodMenu');
+      m.hidden = !m.hidden;
+    }
+    document.addEventListener('click', function (e) {
+      var wrap = document.querySelector('.period-wrap');
+      if (wrap && !wrap.contains(e.target)) el('periodMenu').hidden = true;
+    });
+
+    function fmtDate(d) {
+      var dd = ('0' + d.getDate()).slice(-2);
+      var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+      return dd + '/' + mm + '/' + d.getFullYear();
+    }
+
+    function computeRange(type, cs, ce) {
+      var endMs = Date.now();
+      var day = 86400000;
+      if (type === 'anno') return { startMs: endMs - 365 * day, endMs: endMs, label: 'Ultimo anno' };
+      if (type === 'settimana') return { startMs: endMs - 7 * day, endMs: endMs, label: 'Ultima settimana' };
+      if (type === 'custom') {
+        var s = new Date(cs + 'T00:00:00');
+        var e = new Date(ce + 'T23:59:59.999');
+        return { startMs: s.getTime(), endMs: e.getTime(), label: fmtDate(s) + ' – ' + fmtDate(e) };
+      }
+      return { startMs: endMs - 30 * day, endMs: endMs, label: 'Ultimo mese' };
+    }
+
+    function selectPeriod(type) {
+      if (type === 'custom') {
+        el('customPanel').hidden = false;
+        return; // si applica con "Applica"
+      }
+      currentPeriod = type;
+      el('customPanel').hidden = true;
+      markPeriodMenu(type);
+      el('periodMenu').hidden = true;
+      loadKpi();
+    }
+
+    function applyCustom() {
+      var cs = val('customStart'), ce = val('customEnd');
+      if (!cs || !ce) { toast('Imposta data inizio e fine', 'warning'); return; }
+      if (cs > ce) { toast('La data iniziale è successiva alla finale', 'warning'); return; }
+      currentPeriod = 'custom';
+      markPeriodMenu('custom');
+      el('periodMenu').hidden = true;
+      loadKpi(cs, ce);
+    }
+
+    function markPeriodMenu(type) {
+      var btns = el('periodMenu').querySelectorAll('button[data-type]');
+      btns.forEach(function (b) { b.classList.toggle('sel', b.getAttribute('data-type') === type); });
+    }
+
+    function loadKpi(cs, ce) {
+      var range = computeRange(currentPeriod, cs, ce);
+      el('periodLabel').textContent = range.label;
+      el('chartBox').hidden = true;
+      el('kpiTotal').hidden = true;
+      el('kpiEmpty').hidden = false;
+      el('kpiEmpty').className = 'empty-state';
+      el('kpiEmpty').textContent = 'Caricamento…';
+
+      gscript('getKpiPareto', range.startMs, range.endMs).then(function (data) {
+        renderPareto(data);
+      }).catch(function (e) {
+        console.error(e);
+        el('kpiEmpty').hidden = false;
+        el('kpiEmpty').className = 'empty-state error';
+        el('kpiEmpty').textContent = 'Errore nel caricamento dei dati';
+      });
+    }
+
+    function renderPareto(data) {
+      kpiRows = (data && data.rows) || [];
+      var total = (data && data.total) || 0;
+
+      if (!kpiRows.length) {
+        el('chartBox').hidden = true;
+        el('kpiTotal').hidden = true;
+        el('kpiEmpty').hidden = false;
+        el('kpiEmpty').className = 'empty-state';
+        el('kpiEmpty').textContent = 'Nessuno scarto registrato nel periodo selezionato.';
+        if (paretoChart) { paretoChart.destroy(); paretoChart = null; }
+        return;
+      }
+
+      el('kpiEmpty').hidden = true;
+      el('chartBox').hidden = false;
+      el('kpiTotal').hidden = false;
+      el('kpiTotalNum').textContent = total;
+
+      var labels = kpiRows.map(function (r) { return r.sigla; });
+      var quantities = kpiRows.map(function (r) { return r.quantita; });
+      var cum = 0;
+      var cumPerc = quantities.map(function (q) { cum += q; return total ? Math.round(cum / total * 1000) / 10 : 0; });
+
+      if (paretoChart) paretoChart.destroy();
+      var ctx = el('paretoChart').getContext('2d');
+      paretoChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { type: 'bar', label: 'Pezzi', data: quantities, backgroundColor: '#E79E2F', borderRadius: 6, yAxisID: 'y', order: 2 },
+            { type: 'line', label: 'Cumulato %', data: cumPerc, borderColor: '#C9831F', backgroundColor: '#C9831F', borderWidth: 2, tension: 0.25, pointRadius: 3, yAxisID: 'y1', order: 1 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { font: { family: 'Arial', size: 12 } } },
+            tooltip: {
+              callbacks: {
+                title: function (items) {
+                  var i = items[0].dataIndex;
+                  return kpiRows[i] ? kpiRows[i].causale : '';
+                },
+                label: function (item) {
+                  if (item.dataset.type === 'line') return 'Cumulato: ' + item.formattedValue + '%';
+                  return 'Pezzi: ' + item.formattedValue;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Pezzi' }, ticks: { precision: 0 } },
+            y1: { beginAtZero: true, max: 100, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '%' } },
+            x: { ticks: { autoSkip: false, maxRotation: 90, minRotation: 45, font: { size: 10 } } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
