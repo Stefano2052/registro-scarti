@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Registro Scarti">
   <rect width="512" height="512" rx="115" fill="#E79E2F"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="140" y="156" width="232" height="240" rx="28"/>
-  </g>
-  <rect x="210" y="124" width="92" height="50" rx="16" fill="#FFFFFF"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round">
-    <line x1="200" y1="248" x2="312" y2="360"/>
-    <line x1="312" y1="248" x2="200" y2="360"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="148" y="120" width="216" height="272" rx="26"/>
+    <path d="M256 120 L224 190 L288 244 L220 310 L256 392"/>
   </g>
 </svg>

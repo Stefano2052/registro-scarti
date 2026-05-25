@@ -11,7 +11,7 @@
 var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
 var SHEET_DATI = 'Base dati';
 var SHEET_CAUSALI = 'Causali';
-var STABILIMENTI = ['BB3', 'Ipiemme'];
+var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
 
 /* ============================ ROUTING API ============================ */
 
@@ -56,7 +56,8 @@ function getInitData() {
   return {
     stabilimenti: STABILIMENTI,
     causali: getCausali_(),
-    operatori: getOperatori_()
+    operatori: getOperatori_(),
+    articoli: getArticoli_()
   };
 }
 
@@ -91,6 +92,23 @@ function getOperatori_() {
   return out;
 }
 
+/** Articoli già presenti nel file (colonna C di "Base dati"), distinti e ordinati alfabeticamente. */
+function getArticoli_() {
+  var sheet = ss_().getSheetByName(SHEET_DATI);
+  var last = sheet.getLastRow();
+  if (last < 2) return [];
+  var values = sheet.getRange(2, 3, last - 1, 1).getValues();
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    var v = (values[i][0] || '').toString().trim();
+    var key = v.toLowerCase();
+    if (v && !seen[key]) { seen[key] = true; out.push(v); }
+  }
+  out.sort(function (a, b) { return a.localeCompare(b, 'it', { sensitivity: 'base' }); });
+  return out;
+}
+
 /** Mappa Causale -> Sigla (per le etichette compatte del grafico di Pareto). */
 function getCausaliSigla_() {
   var sheet = ss_().getSheetByName(SHEET_CAUSALI);
@@ -114,7 +132,7 @@ function getCausaliSigla_() {
 function getKpiPareto(startMs, endMs) {
   var sheet = ss_().getSheetByName(SHEET_DATI);
   var last = sheet.getLastRow();
-  if (last < 2) return { rows: [], total: 0 };
+  if (last < 2 || !isFinite(startMs) || !isFinite(endMs)) return { rows: [], total: 0 };
 
   var values = sheet.getRange(2, 1, last - 1, 6).getValues(); // A..F
   var map = {};
@@ -167,13 +185,14 @@ function registraScarto(data) {
   while (variante.length < 6) variante = '0' + variante;
 
   var sheet = ss_().getSheetByName(SHEET_DATI);
-  sheet.appendRow([new Date(), stabilimento, '', '', quantita, causale, operatore, 'NO']);
-  var r = sheet.getLastRow();
-  sheet.getRange(r, 1).setNumberFormat('dd/mm/yyyy hh:mm');
-  // Articolo e Variante forzati a formato testo per non perdere zeri iniziali / notazione.
+  var r = sheet.getLastRow() + 1;
+  // Articolo (C) e Variante (D) forzati a testo PRIMA della scrittura, per non perdere
+  // zeri iniziali / le 13 cifre del codice. Scrittura in un'unica getRange().setValues()
+  // così le colonne C e D vengono sempre alimentate (niente dipendenza da getLastRow()
+  // dopo appendRow()).
   sheet.getRange(r, 3, 1, 2).setNumberFormat('@');
-  sheet.getRange(r, 3).setValue(articolo);
-  sheet.getRange(r, 4).setValue(variante);
+  sheet.getRange(r, 1, 1, 8).setValues([[new Date(), stabilimento, articolo, variante, quantita, causale, operatore, 'NO']]);
+  sheet.getRange(r, 1).setNumberFormat('dd/mm/yyyy hh:mm');
 
   return { ok: true, articolo: articolo, variante: variante, quantita: quantita };
 }
