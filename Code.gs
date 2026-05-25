@@ -12,15 +12,21 @@ var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
 var SHEET_DATI = 'Base dati';
 var SHEET_CAUSALI = 'Causali';
 var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
-var DRIVE_PARENT_NAME = 'Berloni';
 var DRIVE_FOLDER_NAME = 'Registro Scarti - Immagini';
 
+// Lo script usa lo scope OAuth "drive.file": vede SOLO i file che crea lui,
+// non il resto del Drive del proprietario. Per questo non si può cercare una
+// cartella per nome (non la troverebbe): si ricorda l'ID della cartella foto
+// nelle Script Properties dopo averla creata la prima volta.
 function getOrCreateDriveFolder_() {
-  var parents = DriveApp.getFoldersByName(DRIVE_PARENT_NAME);
-  var parent = parents.hasNext() ? parents.next() : DriveApp.createFolder(DRIVE_PARENT_NAME);
-  var subs = parent.getFoldersByName(DRIVE_FOLDER_NAME);
-  if (subs.hasNext()) return subs.next();
-  return parent.createFolder(DRIVE_FOLDER_NAME);
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('FOTO_FOLDER_ID');
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) { /* cartella rimossa: ne creo una nuova */ }
+  }
+  var folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  props.setProperty('FOTO_FOLDER_ID', folder.getId());
+  return folder;
 }
 
 function uploadFotos_(fotos) {
