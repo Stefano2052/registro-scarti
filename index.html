@@ -577,7 +577,7 @@
   <!-- Input fotocamera (capture posteriore) — usato solo per scansione barcode -->
   <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="processPhotoFile(this)">
   <!-- Input foto allegati allo scarto (nessun capture — l'utente sceglie tra fotocamera e galleria) -->
-  <input type="file" id="fotoInput" accept="image/*" multiple style="display:none" onchange="processFotoFiles(this)">
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" multiple style="display:none" onchange="processFotoFiles(this)">
 
   <!-- Scanner live (solo se BarcodeDetector non disponibile e Quagga2 carica) -->
   <div class="scanner-overlay" id="scannerOverlay">
