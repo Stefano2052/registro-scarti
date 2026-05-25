@@ -4,7 +4,7 @@
  * Il frontend (index.html) è ospitato su GitHub Pages e chiama questa web app via fetch().
  *
  * Foglio "Base dati":  A Data | B Stabilimento | C Articolo | D Variante |
- *                      E Quantità | F Causale | G Operatore | H Registrato su Essentia
+ *                      E Quantità | F Causale | G Operatore | H Immagini | I Registrato su Essentia
  * Foglio "Causali":    A Classificazione | B Causale | C Provenienza | D Sigla
  */
 
@@ -12,6 +12,31 @@ var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
 var SHEET_DATI = 'Base dati';
 var SHEET_CAUSALI = 'Causali';
 var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
+var DRIVE_FOLDER_NAME = 'Registro Scarti - Immagini';
+
+function getOrCreateDriveFolder_() {
+  var folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(DRIVE_FOLDER_NAME);
+}
+
+function uploadFotos_(fotos) {
+  if (!fotos || !fotos.length) return '';
+  var folder = getOrCreateDriveFolder_();
+  var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var urls = [];
+  for (var i = 0; i < fotos.length; i++) {
+    try {
+      var blob = Utilities.newBlob(Utilities.base64Decode(fotos[i]), 'image/jpeg', timestamp + '_' + (i + 1) + '.jpg');
+      var file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      urls.push(file.getUrl());
+    } catch (e) {
+      console.warn('Errore upload foto ' + (i + 1), e);
+    }
+  }
+  return urls.join('\n');
+}
 
 /* ============================ ROUTING API ============================ */
 
@@ -172,6 +197,7 @@ function registraScarto(data) {
   var stabilimento = (data.stabilimento || '').toString().trim();
   var operatore = (data.operatore || '').toString().trim();
   var causale = (data.causale || '').toString().trim();
+  var fotos = Array.isArray(data.foto) ? data.foto : [];
 
   if (articolo.length !== 13) throw new Error('Il codice articolo deve avere 13 caratteri.');
   if (!/^\d+$/.test(varianteRaw)) throw new Error('La variante deve essere solo numerica.');
@@ -184,6 +210,8 @@ function registraScarto(data) {
   var variante = varianteRaw;
   while (variante.length < 6) variante = '0' + variante;
 
+  var immagini = uploadFotos_(fotos);
+
   var sheet = ss_().getSheetByName(SHEET_DATI);
   var r = sheet.getLastRow() + 1;
   // Articolo (C) e Variante (D) forzati a testo PRIMA della scrittura, per non perdere
@@ -191,7 +219,7 @@ function registraScarto(data) {
   // così le colonne C e D vengono sempre alimentate (niente dipendenza da getLastRow()
   // dopo appendRow()).
   sheet.getRange(r, 3, 1, 2).setNumberFormat('@');
-  sheet.getRange(r, 1, 1, 8).setValues([[new Date(), stabilimento, articolo, variante, quantita, causale, operatore, 'NO']]);
+  sheet.getRange(r, 1, 1, 9).setValues([[new Date(), stabilimento, articolo, variante, quantita, causale, operatore, immagini, 'NO']]);
   sheet.getRange(r, 1).setNumberFormat('dd/mm/yyyy hh:mm');
 
   return { ok: true, articolo: articolo, variante: variante, quantita: quantita };
