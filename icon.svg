@@ -1,7 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Registro Scarti">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="115" fill="#E79E2F"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="148" y="120" width="216" height="272" rx="26"/>
-    <path d="M256 120 L224 190 L288 244 L220 310 L256 392"/>
+
+  <g fill="white">
+    <!-- Pannello -->
+    <rect x="126" y="96" width="260" height="320" rx="28"/>
+
+    <!-- Frattura -->
+    <polygon fill="#E79E2F"
+      points="
+      255,96
+      215,180
+      278,244
+      218,320
+      258,416
+      298,416
+      258,320
+      318,244
+      255,180
+      295,96
+      "/>
   </g>
 </svg>
