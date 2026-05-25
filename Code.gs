@@ -24,7 +24,7 @@ function getOrCreateDriveFolder_() {
 }
 
 function uploadFotos_(fotos) {
-  if (!fotos || !fotos.length) return '';
+  if (!fotos || !fotos.length) return [];
   var folder = getOrCreateDriveFolder_();
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
   var urls = [];
@@ -38,7 +38,21 @@ function uploadFotos_(fotos) {
       console.warn('Errore upload foto ' + (i + 1), e);
     }
   }
-  return urls.join('\n');
+  return urls;
+}
+
+/** Cella con un link cliccabile per foto ("Foto 1", "Foto 2", …) su righe separate. */
+function buildFotoRichText_(urls) {
+  var labels = [];
+  for (var i = 0; i < urls.length; i++) labels.push('Foto ' + (i + 1));
+  var text = labels.join('\n');
+  var builder = SpreadsheetApp.newRichTextValue().setText(text);
+  var pos = 0;
+  for (var j = 0; j < labels.length; j++) {
+    builder.setLinkUrl(pos, pos + labels[j].length, urls[j]);
+    pos += labels[j].length + 1; // +1 per il "\n"
+  }
+  return builder.build();
 }
 
 /* ============================ ROUTING API ============================ */
@@ -213,7 +227,7 @@ function registraScarto(data) {
   var variante = varianteRaw;
   while (variante.length < 6) variante = '0' + variante;
 
-  var immagini = uploadFotos_(fotos);
+  var fotoUrls = uploadFotos_(fotos);
 
   var sheet = ss_().getSheetByName(SHEET_DATI);
   var r = sheet.getLastRow() + 1;
@@ -222,8 +236,10 @@ function registraScarto(data) {
   // così le colonne C e D vengono sempre alimentate (niente dipendenza da getLastRow()
   // dopo appendRow()).
   sheet.getRange(r, 3, 1, 2).setNumberFormat('@');
-  sheet.getRange(r, 1, 1, 9).setValues([[new Date(), stabilimento, articolo, variante, quantita, causale, operatore, immagini, 'NO']]);
+  sheet.getRange(r, 1, 1, 9).setValues([[new Date(), stabilimento, articolo, variante, quantita, causale, operatore, '', 'NO']]);
   sheet.getRange(r, 1).setNumberFormat('dd/mm/yyyy hh:mm');
+  // Colonna H "Immagini": link cliccabili con testo breve ("Foto 1", "Foto 2", …).
+  if (fotoUrls.length) sheet.getRange(r, 8).setRichTextValue(buildFotoRichText_(fotoUrls));
 
   return { ok: true, articolo: articolo, variante: variante, quantita: quantita };
 }
