@@ -390,7 +390,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      width: 100%;
+      flex: 1;
       padding: 14px 16px;
       min-height: 50px;
       background: var(--surface);
@@ -465,13 +465,21 @@
 
         <div class="field-group">
           <label>Foto <span style="font-weight:400;color:var(--text-secondary)">(opzionale)</span></label>
-          <label for="fotoInput" class="btn-add-foto">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Aggiungi foto
-          </label>
+          <div class="scan-row">
+            <label for="fotoInput" class="btn-add-foto">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              Galleria
+            </label>
+            <label for="cameraInput" class="btn-scan" aria-label="Scatta foto">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </label>
+          </div>
           <div class="foto-list" id="fotoList"></div>
         </div>
 
@@ -576,8 +584,10 @@
 
   <!-- Input fotocamera (capture posteriore) — usato solo per scansione barcode -->
   <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="processPhotoFile(this)">
-  <!-- Input foto allegati allo scarto (nessun capture — l'utente sceglie tra fotocamera e galleria) -->
+  <!-- Input foto: galleria (multiple, senza capture) -->
   <input type="file" id="fotoInput" accept="image/*" multiple style="display:none" onchange="processFotoFiles(this)">
+  <!-- Input foto: fotocamera diretta (capture, una per volta) -->
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processFotoFiles(this)">
 
   <!-- Scanner live (solo se BarcodeDetector non disponibile e Quagga2 carica) -->
   <div class="scanner-overlay" id="scannerOverlay">
