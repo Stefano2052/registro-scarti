@@ -12,12 +12,15 @@ var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
 var SHEET_DATI = 'Base dati';
 var SHEET_CAUSALI = 'Causali';
 var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
+var DRIVE_PARENT_NAME = 'Berloni';
 var DRIVE_FOLDER_NAME = 'Registro Scarti - Immagini';
 
 function getOrCreateDriveFolder_() {
-  var folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
-  if (folders.hasNext()) return folders.next();
-  return DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  var parents = DriveApp.getFoldersByName(DRIVE_PARENT_NAME);
+  var parent = parents.hasNext() ? parents.next() : DriveApp.createFolder(DRIVE_PARENT_NAME);
+  var subs = parent.getFoldersByName(DRIVE_FOLDER_NAME);
+  if (subs.hasNext()) return subs.next();
+  return parent.createFolder(DRIVE_FOLDER_NAME);
 }
 
 function uploadFotos_(fotos) {
