@@ -624,7 +624,13 @@
         return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
       }).join('&');
       return fetch(SCRIPT_URL + '?' + qs)
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          var ct = r.headers.get('content-type') || '';
+          if (!ct.includes('json')) {
+            throw new Error('Risposta non valida dal server (HTTP ' + r.status + '). Verifica che la web app Apps Script sia distribuita correttamente.');
+          }
+          return r.json();
+        })
         .then(function (data) {
           if (data && data.error) throw new Error(data.error);
           return data;
@@ -675,20 +681,44 @@
     }
 
     /* ============ Init dati ============ */
-    document.addEventListener('DOMContentLoaded', function () {
-      if (SCRIPT_URL.indexOf('INCOLLA') !== -1) {
-        toast('Configura SCRIPT_URL in index.html', 'warning');
-        return;
-      }
+    function loadInitData() {
       apiGet({ action: 'init' }).then(function (data) {
+        hideInitError();
         fillSelect('stabilimento', data.stabilimenti);
         fillSelect('causale', data.causali);
         fillArticoli(data.articoli);
         fillOperatori(data.operatori);
       }).catch(function (e) {
+        var msg = (e && e.message) ? e.message : 'Errore sconosciuto';
         toast('Errore nel caricamento dei dati', 'error');
+        showInitError(msg);
         console.error(e);
       });
+    }
+
+    function showInitError(msg) {
+      var existing = document.getElementById('initErrorBanner');
+      if (existing) existing.remove();
+      var banner = document.createElement('div');
+      banner.id = 'initErrorBanner';
+      banner.style.cssText = 'background:var(--error-bg);color:var(--error-text);border:1px solid #e0b3b0;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;font-size:13px;';
+      banner.innerHTML = '<strong>Errore nel caricamento dei dati</strong><br><span style="font-weight:400">' + msg + '</span>' +
+        '<br><button onclick="loadInitData()" style="margin-top:8px;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;">Riprova</button>';
+      var card = document.querySelector('#panelRegistra .card');
+      if (card) card.insertBefore(banner, card.firstChild);
+    }
+
+    function hideInitError() {
+      var existing = document.getElementById('initErrorBanner');
+      if (existing) existing.remove();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (SCRIPT_URL.indexOf('INCOLLA') !== -1) {
+        toast('Configura SCRIPT_URL in index.html', 'warning');
+        return;
+      }
+      loadInitData();
     });
 
     function fillSelect(id, items) {
