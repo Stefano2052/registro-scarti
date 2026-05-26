@@ -313,6 +313,63 @@ function getKpiPareto(startMs, endMs, stabilimento) {
   };
 }
 
+/* ============================ DIAGNOSTICA ============================ */
+
+// Intestazioni attese nel foglio "Base dati", nell'ordine delle colonne da cui
+// dipende il codice. Si confrontano in modo "tollerante" (minuscole, senza
+// accenti, per prefisso) così "Registrato su Essentia" combacia con "Registrato".
+var HEADER_ATTESI = [
+  'Data',
+  'Stabilimento',
+  'Articolo',
+  'Variante',
+  'Descrizione',
+  'Quantità',
+  'Causale',
+  'Operatore',
+  'Immagini',
+  'Registrato'
+];
+
+function normHeader_(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+// Verifica che le colonne di "Base dati" siano allineate a quanto si aspetta il
+// codice. Eseguibile dall'editor Apps Script (Esegui -> doctor): l'esito è nel
+// log e nel valore restituito. Utile dopo aver spostato/aggiunto colonne.
+function doctor() {
+  var sheet = ss_().getSheetByName(SHEET_DATI);
+  if (!sheet) throw new Error('Foglio "' + SHEET_DATI + '" non trovato.');
+
+  var nCol = Math.max(sheet.getLastColumn(), HEADER_ATTESI.length);
+  var headers = sheet.getRange(1, 1, 1, nCol).getValues()[0];
+
+  var colonne = [];
+  var ok = true;
+
+  for (var i = 0; i < HEADER_ATTESI.length; i++) {
+    var atteso = HEADER_ATTESI[i];
+    var trovato = String(headers[i] || '').trim();
+    var allineato = normHeader_(trovato).indexOf(normHeader_(atteso)) === 0;
+    if (!allineato) ok = false;
+    colonne.push({
+      colonna: i + 1,
+      atteso: atteso,
+      trovato: trovato,
+      esito: allineato ? 'OK' : 'DISALLINEATO'
+    });
+  }
+
+  var result = { ok: ok, colonne: colonne };
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
 /* ============================ SCRITTURE ============================ */
 
 function registraScarto(data) {
