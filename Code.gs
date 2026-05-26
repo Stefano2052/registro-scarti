@@ -121,7 +121,8 @@ function doGet(e) {
       return json_(
         getKpiPareto(
           Number(e.parameter.start),
-          Number(e.parameter.end)
+          Number(e.parameter.end),
+          e.parameter.stabilimento || ''
         )
       );
     }
@@ -225,7 +226,7 @@ function getDistinctSorted_(column) {
 }
 
 function getOperatori_() {
-  return getDistinctSorted_(7);
+  return getDistinctSorted_(8);
 }
 
 function getArticoli_() {
@@ -255,7 +256,7 @@ function getCausaliSigla_() {
   return map;
 }
 
-function getKpiPareto(startMs, endMs) {
+function getKpiPareto(startMs, endMs, stabilimento) {
   var sheet = ss_().getSheetByName(SHEET_DATI);
   if (!sheet) throw new Error('Foglio "' + SHEET_DATI + '" non trovato.');
 
@@ -265,7 +266,9 @@ function getKpiPareto(startMs, endMs) {
     return { rows: [], total: 0 };
   }
 
-  var values = sheet.getRange(2, 1, last - 1, 6).getValues();
+  var filtroStab = String(stabilimento || '').trim();
+
+  var values = sheet.getRange(2, 1, last - 1, 7).getValues();
   var map = {};
 
   for (var i = 0; i < values.length; i++) {
@@ -277,10 +280,12 @@ function getKpiPareto(startMs, endMs) {
 
     if (t < startMs || t > endMs) continue;
 
-    var causale = String(values[i][5] || '').trim();
+    if (filtroStab && String(values[i][1] || '').trim() !== filtroStab) continue;
+
+    var causale = String(values[i][6] || '').trim();
     if (!causale) continue;
 
-    var q = Number(values[i][4]) || 0;
+    var q = Number(values[i][5]) || 0;
     map[causale] = (map[causale] || 0) + q;
   }
 
@@ -315,18 +320,26 @@ function registraScarto(data) {
 
   var articolo = String(data.articolo || '').trim();
   var varianteRaw = String(data.variante || '').trim();
+  var descrizione = String(data.descrizione || '').trim();
   var quantita = Number(data.quantita);
   var stabilimento = String(data.stabilimento || '').trim();
   var operatore = String(data.operatore || '').trim();
   var causale = String(data.causale || '').trim();
   var fotos = Array.isArray(data.foto) ? data.foto : [];
 
-  if (articolo.length !== 13) {
-    throw new Error('Il codice articolo deve avere 13 caratteri.');
-  }
+  // Quando l'operatore non conosce articolo e variante usa la descrizione:
+  // in quel caso articolo e variante non sono obbligatori.
+  if (descrizione) {
+    articolo = '';
+    varianteRaw = '';
+  } else {
+    if (articolo.length !== 13) {
+      throw new Error('Il codice articolo deve avere 13 caratteri.');
+    }
 
-  if (!/^\d+$/.test(varianteRaw)) {
-    throw new Error('La variante deve essere solo numerica.');
+    if (!/^\d+$/.test(varianteRaw)) {
+      throw new Error('La variante deve essere solo numerica.');
+    }
   }
 
   if (!quantita || quantita <= 0) {
@@ -347,7 +360,7 @@ function registraScarto(data) {
 
   var variante = varianteRaw;
 
-  while (variante.length < 6) {
+  while (variante && variante.length < 6) {
     variante = '0' + variante;
   }
 
@@ -360,11 +373,12 @@ function registraScarto(data) {
 
   sheet.getRange(r, 3, 1, 2).setNumberFormat('@');
 
-  sheet.getRange(r, 1, 1, 9).setValues([[
+  sheet.getRange(r, 1, 1, 10).setValues([[
     new Date(),
     stabilimento,
     articolo,
     variante,
+    descrizione,
     quantita,
     causale,
     operatore,
@@ -375,13 +389,14 @@ function registraScarto(data) {
   sheet.getRange(r, 1).setNumberFormat('dd/mm/yyyy hh:mm');
 
   if (fotoUrls.length) {
-    sheet.getRange(r, 8).setRichTextValue(buildFotoRichText_(fotoUrls));
+    sheet.getRange(r, 9).setRichTextValue(buildFotoRichText_(fotoUrls));
   }
 
   return {
     ok: true,
     articolo: articolo,
     variante: variante,
+    descrizione: descrizione,
     quantita: quantita,
     foto: fotoUrls
   };

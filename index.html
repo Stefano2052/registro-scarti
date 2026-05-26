@@ -201,6 +201,29 @@
     .btn-scan:active { transform: translateY(1px); }
     .btn-scan:disabled { opacity: 0.5; }
 
+    /* Scansione articolo + variante: il tasto affianca entrambi i campi
+       per chiarire che la lettura compila sia l'articolo sia la variante. */
+    .scan-combo { display: flex; gap: 8px; align-items: stretch; margin-bottom: 14px; }
+    .scan-combo .scan-combo-fields { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+    .scan-combo .scan-combo-fields .field-group { margin-bottom: 0; }
+    .scan-combo .btn-scan { height: auto; align-self: stretch; }
+
+    /* Domanda cliccabile "Non conosci articolo e variante?" */
+    .link-toggle {
+      background: none;
+      border: none;
+      padding: 0;
+      margin: -4px 0 14px;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .link-toggle:hover { color: var(--primary); }
+
     .scanned-badge {
       font-size: 11px;
       font-weight: 700;
@@ -256,6 +279,16 @@
 
     /* ===== KPI / periodo ===== */
     .period-wrap { position: relative; margin-bottom: 14px; }
+
+    /* Filtri KPI affiancati (periodo + stabilimento) con stessa grafica. */
+    .kpi-filters { display: flex; gap: 8px; margin-bottom: 14px; }
+    .kpi-filters .period-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+    .kpi-filters .period-btn { width: 100%; }
+    .kpi-filters .period-btn > span:first-of-type {
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+    }
+    .period-menu.align-right { left: auto; right: 0; }
     .period-btn {
       display: inline-flex;
       align-items: center;
@@ -483,26 +516,40 @@
           <div class="foto-list" id="fotoList"></div>
         </div>
 
-        <div class="field-group">
-          <label for="articolo">Articolo <span class="scanned-badge" id="scanBadge" style="display:none">✅ scansionato</span></label>
-          <div class="scan-row">
-            <select id="articolo" onchange="onArticoloChange()">
-              <option value="">— Seleziona —</option>
-            </select>
-            <button class="btn-scan" id="btnScan" onclick="startScan()" aria-label="Scansiona codice a barre">
+        <!-- Modalità codice: articolo + variante con scansione di entrambi -->
+        <div id="modeCodice">
+          <div class="scan-combo">
+            <div class="scan-combo-fields">
+              <div class="field-group">
+                <label for="articolo">Articolo <span class="scanned-badge" id="scanBadge" style="display:none">✅ scansionato</span></label>
+                <select id="articolo" onchange="onArticoloChange()">
+                  <option value="">— Seleziona —</option>
+                </select>
+                <input type="text" id="nuovoArticolo" inputmode="text" autocomplete="off" maxlength="13" placeholder="Codice articolo (13 caratteri)" style="display:none">
+              </div>
+              <div class="field-group">
+                <label for="variante">Variante</label>
+                <input type="text" id="variante" inputmode="numeric" autocomplete="off" placeholder="Es. 202">
+              </div>
+            </div>
+            <button class="btn-scan" id="btnScan" onclick="startScan()" aria-label="Scansiona articolo e variante">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
             </button>
           </div>
-          <input type="text" id="nuovoArticolo" inputmode="text" autocomplete="off" maxlength="13" placeholder="Codice articolo (13 caratteri)" style="display:none">
           <div class="scan-debug" id="scanDebug"></div>
+          <button type="button" class="link-toggle" onclick="setDescrizioneMode(true)">Non conosci articolo e variante?</button>
         </div>
 
-        <div class="field-group">
-          <label for="variante">Variante</label>
-          <input type="text" id="variante" inputmode="numeric" autocomplete="off" placeholder="Es. 202">
+        <!-- Modalità descrizione: l'operatore descrive l'articolo -->
+        <div id="modeDescrizione" style="display:none">
+          <div class="field-group">
+            <label for="descrizione">Descrizione</label>
+            <input type="text" id="descrizione" autocomplete="off" placeholder="Es. Fianco dx 550x480 Bianco Premium">
+          </div>
+          <button type="button" class="link-toggle" onclick="setDescrizioneMode(false)">Conosci articolo e variante? Inseriscili</button>
         </div>
 
         <div class="field-group">
@@ -542,29 +589,44 @@
       <div class="page-title">Pareto scarti per causale</div>
       <div class="card">
 
-        <div class="period-wrap">
-          <button class="period-btn" id="periodBtn" onclick="togglePeriodMenu()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            <span id="periodLabel">Ultimo mese</span>
-            <span class="caret">▾</span>
-          </button>
-          <div class="period-menu" id="periodMenu" hidden>
-            <button data-type="anno" onclick="selectPeriod('anno')">Ultimo anno</button>
-            <button data-type="mese" class="sel" onclick="selectPeriod('mese')">Ultimo mese</button>
-            <button data-type="settimana" onclick="selectPeriod('settimana')">Ultima settimana</button>
-            <button data-type="custom" onclick="selectPeriod('custom')">Personalizza…</button>
-            <div class="custom-panel" id="customPanel" hidden>
-              <div>
-                <label for="customStart">Dal</label>
-                <input type="date" id="customStart">
+        <div class="kpi-filters">
+          <div class="period-wrap">
+            <button class="period-btn" id="periodBtn" onclick="togglePeriodMenu()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              <span id="periodLabel">Ultimo mese</span>
+              <span class="caret">▾</span>
+            </button>
+            <div class="period-menu" id="periodMenu" hidden>
+              <button data-type="anno" onclick="selectPeriod('anno')">Ultimo anno</button>
+              <button data-type="mese" class="sel" onclick="selectPeriod('mese')">Ultimo mese</button>
+              <button data-type="settimana" onclick="selectPeriod('settimana')">Ultima settimana</button>
+              <button data-type="custom" onclick="selectPeriod('custom')">Personalizza…</button>
+              <div class="custom-panel" id="customPanel" hidden>
+                <div>
+                  <label for="customStart">Dal</label>
+                  <input type="date" id="customStart">
+                </div>
+                <div>
+                  <label for="customEnd">Al</label>
+                  <input type="date" id="customEnd">
+                </div>
+                <button class="btn-apply" onclick="applyCustom()">Applica</button>
               </div>
-              <div>
-                <label for="customEnd">Al</label>
-                <input type="date" id="customEnd">
-              </div>
-              <button class="btn-apply" onclick="applyCustom()">Applica</button>
+            </div>
+          </div>
+
+          <div class="period-wrap">
+            <button class="period-btn" id="stabFilterBtn" onclick="toggleStabMenu()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>
+              </svg>
+              <span id="stabFilterLabel">Tutti gli stabilimenti</span>
+              <span class="caret">▾</span>
+            </button>
+            <div class="period-menu align-right" id="stabMenu" hidden>
+              <button data-stab="" class="sel" onclick="selectStab('')">Tutti gli stabilimenti</button>
             </div>
           </div>
         </div>
@@ -685,6 +747,7 @@
       apiGet({ action: 'init' }).then(function (data) {
         hideInitError();
         fillSelect('stabilimento', data.stabilimenti);
+        fillStabFilter(data.stabilimenti);
         fillSelect('causale', data.causali);
         fillArticoli(data.articoli);
         fillOperatori(data.operatori);
@@ -787,19 +850,37 @@
       }
     }
 
+    /* ============ Modalità descrizione ============ */
+    /* Alterna fra inserimento per codice (articolo + variante) e descrizione
+       libera, per gli operatori che non conoscono articolo e variante. */
+    var descrizioneMode = false;
+    function setDescrizioneMode(on) {
+      descrizioneMode = on;
+      el('modeCodice').style.display = on ? 'none' : '';
+      el('modeDescrizione').style.display = on ? '' : 'none';
+      if (on) el('descrizione').focus();
+    }
+
     /* ============ Salvataggio ============ */
     function salva() {
       var articolo = val('articolo');
       if (articolo === '__new__') articolo = val('nuovoArticolo').trim();
       var variante = val('variante').trim();
+      var descrizione = val('descrizione').trim();
       var quantitaStr = val('quantita').trim();
       var stabilimento = val('stabilimento');
       var operatore = val('operatore');
       if (operatore === '__new__') operatore = val('nuovoOperatore').trim();
       var causale = val('causale');
 
-      if (articolo.length !== 13) { toast('Il codice articolo deve avere 13 caratteri.', 'warning'); el('articolo').focus(); return; }
-      if (!/^\d+$/.test(variante)) { toast('La variante deve essere solo numerica.', 'warning'); el('variante').focus(); return; }
+      if (descrizioneMode) {
+        if (!descrizione) { toast('Inserisci la descrizione dell\'articolo.', 'warning'); el('descrizione').focus(); return; }
+        articolo = ''; variante = '';
+      } else {
+        descrizione = '';
+        if (articolo.length !== 13) { toast('Il codice articolo deve avere 13 caratteri.', 'warning'); el('articolo').focus(); return; }
+        if (!/^\d+$/.test(variante)) { toast('La variante deve essere solo numerica.', 'warning'); el('variante').focus(); return; }
+      }
       var quantita = Number(quantitaStr);
       if (!quantita || quantita <= 0) { toast('Inserisci una quantità valida.', 'warning'); el('quantita').focus(); return; }
       if (!stabilimento) { toast('Seleziona lo stabilimento.', 'warning'); return; }
@@ -813,7 +894,7 @@
       apiPost({
         action: 'registra',
         data: {
-          articolo: articolo, variante: variante, quantita: quantita,
+          articolo: articolo, variante: variante, descrizione: descrizione, quantita: quantita,
           stabilimento: stabilimento, operatore: operatore, causale: causale,
           foto: selectedPhotos.map(function (d) { return d.split(',')[1]; })
         }
@@ -835,10 +916,11 @@
     }
 
     function resetForm() {
-      ['variante', 'quantita', 'nuovoOperatore', 'nuovoArticolo'].forEach(function (id) { el(id).value = ''; });
+      ['variante', 'quantita', 'nuovoOperatore', 'nuovoArticolo', 'descrizione'].forEach(function (id) { el(id).value = ''; });
       ['articolo', 'stabilimento', 'operatore', 'causale'].forEach(function (id) { el(id).selectedIndex = 0; });
       el('nuovoOperatore').style.display = 'none';
       el('nuovoArticolo').style.display = 'none';
+      setDescrizioneMode(false);
       clearScanned();
       setDebug('');
       clearFotos();
@@ -1172,15 +1254,49 @@
     var kpiRows = [];
     var currentPeriod = 'mese';
     var customStartVal = '', customEndVal = '';
+    var currentStab = '';
 
     function togglePeriodMenu() {
       var m = el('periodMenu');
       m.hidden = !m.hidden;
     }
     document.addEventListener('click', function (e) {
-      var wrap = document.querySelector('.period-wrap');
-      if (wrap && !wrap.contains(e.target)) el('periodMenu').hidden = true;
+      var pWrap = el('periodBtn').closest('.period-wrap');
+      if (pWrap && !pWrap.contains(e.target)) el('periodMenu').hidden = true;
+      var sWrap = el('stabFilterBtn').closest('.period-wrap');
+      if (sWrap && !sWrap.contains(e.target)) el('stabMenu').hidden = true;
     });
+
+    /* Filtro stabilimento KPI: stessa logica grafica del filtro periodo. */
+    function fillStabFilter(items) {
+      var menu = el('stabMenu');
+      menu.querySelectorAll('button[data-stab]:not([data-stab=""])').forEach(function (b) { b.remove(); });
+      (items || []).forEach(function (s) {
+        var b = document.createElement('button');
+        b.setAttribute('data-stab', s);
+        b.textContent = s;
+        b.onclick = function () { selectStab(s); };
+        menu.appendChild(b);
+      });
+    }
+
+    function toggleStabMenu() {
+      var m = el('stabMenu');
+      m.hidden = !m.hidden;
+    }
+
+    function selectStab(s) {
+      currentStab = s;
+      el('stabFilterLabel').textContent = s || 'Tutti gli stabilimenti';
+      markStabMenu(s);
+      el('stabMenu').hidden = true;
+      loadKpi();
+    }
+
+    function markStabMenu(s) {
+      var btns = el('stabMenu').querySelectorAll('button[data-stab]');
+      btns.forEach(function (b) { b.classList.toggle('sel', b.getAttribute('data-stab') === s); });
+    }
 
     function fmtDate(d) {
       var dd = ('0' + d.getDate()).slice(-2);
@@ -1238,7 +1354,10 @@
       el('kpiEmpty').className = 'empty-state';
       el('kpiEmpty').textContent = 'Caricamento…';
 
-      apiGet({ action: 'kpi', start: range.startMs, end: range.endMs }).then(function (data) {
+      var params = { action: 'kpi', start: range.startMs, end: range.endMs };
+      if (currentStab) params.stabilimento = currentStab;
+
+      apiGet(params).then(function (data) {
         renderPareto(data);
       }).catch(function (e) {
         console.error(e);
