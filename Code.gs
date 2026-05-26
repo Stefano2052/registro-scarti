@@ -8,8 +8,9 @@
  * - Progetto STANDALONE (non container-bound): accede al foglio via
  *   SpreadsheetApp.openById, quindi servono gli scope completi.
  * - Scope richiesti:
- *   - spreadsheets
- *   - drive.file (accesso ai soli file creati dall'app)
+ *   - spreadsheets (accesso ai Fogli, non a Drive)
+ *   - drive.file (solo i file creati da quest'app, non il resto del Drive)
+ * - Servizio avanzato richiesto: Drive API v3 (abilitare in "Servizi avanzati")
  */
 
 var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
@@ -19,10 +20,11 @@ var SHEET_CAUSALI = 'Causali';
 var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
 
 // Cartella Drive per le foto, creata e gestita dall'app stessa.
-// Con lo scope drive.file l'app può accedere solo ai file che crea, quindi
-// non si può usare una cartella preesistente: la creiamo al primo upload e
-// ne memorizziamo l'ID nelle proprietà dello script.
-var DRIVE_FOLDER_NAME = 'Registro Scarti - Foto';
+// DriveApp richiede lo scope drive completo: si usa invece il servizio
+// avanzato Drive (Drive.Files.*) che funziona con drive.file per i file
+// creati dall'app. L'ID della cartella è memorizzato nelle proprietà dello
+// script e riusato a ogni upload successivo.
+var DRIVE_FOLDER_NAME = 'Registro Scarti - Immagini';
 
 /* ============================ DRIVE FOTO ============================ */
 
@@ -32,21 +34,26 @@ function getDriveFolder_() {
 
   if (id) {
     try {
-      return DriveApp.getFolderById(id);
+      Drive.Files.get(id, {fields: 'id'});
+      return id;
     } catch (e) {
-      // Cartella rimossa o non più accessibile: la ricreo sotto.
+      // Cartella rimossa o non più accessibile: ne creo una nuova.
     }
   }
 
-  var folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
-  props.setProperty('FOTO_FOLDER_ID', folder.getId());
-  return folder;
+  var folder = Drive.Files.create(
+    {name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder'},
+    null,
+    {fields: 'id'}
+  );
+  props.setProperty('FOTO_FOLDER_ID', folder.id);
+  return folder.id;
 }
 
 function uploadFotos_(fotos) {
   if (!fotos || !fotos.length) return [];
 
-  var folder = getDriveFolder_();
+  var folderId = getDriveFolder_();
   var timestamp = Utilities.formatDate(
     new Date(),
     Session.getScriptTimeZone(),
@@ -63,13 +70,17 @@ function uploadFotos_(fotos) {
         timestamp + '_' + (i + 1) + '.jpg'
       );
 
-      var file = folder.createFile(blob);
+      var file = Drive.Files.create(
+        {name: blob.getName(), parents: [folderId]},
+        blob,
+        {fields: 'id'}
+      );
 
       // Rende il singolo file visibile a chiunque abbia il link, così le
       // foto restano apribili dai link salvati nel foglio.
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      Drive.Permissions.create({role: 'reader', type: 'anyone'}, file.id);
 
-      urls.push(file.getUrl());
+      urls.push('https://drive.google.com/file/d/' + file.id + '/view');
     } catch (e) {
       console.warn('Errore upload foto ' + (i + 1), e);
     }
