@@ -123,12 +123,12 @@ function getCausali_() {
   return out;
 }
 
-/** Operatori già presenti nel file (colonna G di "Base dati"), distinti e ordinati alfabeticamente. */
-function getOperatori_() {
+/** Valori distinti di una colonna di "Base dati", ordinati alfabeticamente (italiano). */
+function getDistinctSorted_(column) {
   var sheet = ss_().getSheetByName(SHEET_DATI);
   var last = sheet.getLastRow();
   if (last < 2) return [];
-  var values = sheet.getRange(2, 7, last - 1, 1).getValues();
+  var values = sheet.getRange(2, column, last - 1, 1).getValues();
   var seen = {};
   var out = [];
   for (var i = 0; i < values.length; i++) {
@@ -140,22 +140,11 @@ function getOperatori_() {
   return out;
 }
 
+/** Operatori già presenti nel file (colonna G di "Base dati"), distinti e ordinati alfabeticamente. */
+function getOperatori_() { return getDistinctSorted_(7); }
+
 /** Articoli già presenti nel file (colonna C di "Base dati"), distinti e ordinati alfabeticamente. */
-function getArticoli_() {
-  var sheet = ss_().getSheetByName(SHEET_DATI);
-  var last = sheet.getLastRow();
-  if (last < 2) return [];
-  var values = sheet.getRange(2, 3, last - 1, 1).getValues();
-  var seen = {};
-  var out = [];
-  for (var i = 0; i < values.length; i++) {
-    var v = (values[i][0] || '').toString().trim();
-    var key = v.toLowerCase();
-    if (v && !seen[key]) { seen[key] = true; out.push(v); }
-  }
-  out.sort(function (a, b) { return a.localeCompare(b, 'it', { sensitivity: 'base' }); });
-  return out;
-}
+function getArticoli_() { return getDistinctSorted_(3); }
 
 /** Mappa Causale -> Sigla (per le etichette compatte del grafico di Pareto). */
 function getCausaliSigla_() {

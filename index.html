@@ -701,18 +701,22 @@
       });
     }
 
-    function fillOperatori(items) {
-      var sel = el('operatore');
-      sel.length = 1;
-      (items || []).forEach(function (v) {
-        var o = document.createElement('option');
-        o.value = v; o.textContent = v;
-        sel.appendChild(o);
-      });
+    /* Popola un select con gli items più la voce "__new__" in coda.
+       Con preserveSelection ripristina la selezione precedente se ancora valida
+       (es. articolo dopo refresh post-salvataggio). */
+    function fillSelectWithNew(id, items, newLabel, preserveSelection) {
+      var sel = el(id);
+      var prev = preserveSelection ? sel.value : '';
+      fillSelect(id, items);
       var nuovo = document.createElement('option');
       nuovo.value = '__new__';
-      nuovo.textContent = '➕ Aggiungi nuovo operatore…';
+      nuovo.textContent = newLabel;
       sel.appendChild(nuovo);
+      if (prev) sel.value = prev;
+    }
+
+    function fillOperatori(items) {
+      fillSelectWithNew('operatore', items, '➕ Aggiungi nuovo operatore…', false);
     }
 
     function onOperatoreChange() {
@@ -723,20 +727,7 @@
     }
 
     function fillArticoli(items) {
-      var sel = el('articolo');
-      var prev = sel.value;
-      sel.length = 1; // mantiene il placeholder
-      (items || []).forEach(function (v) {
-        var o = document.createElement('option');
-        o.value = v; o.textContent = v;
-        sel.appendChild(o);
-      });
-      var nuovo = document.createElement('option');
-      nuovo.value = '__new__';
-      nuovo.textContent = '➕ Aggiungi nuovo articolo…';
-      sel.appendChild(nuovo);
-      // ripristina la selezione precedente se ancora valida (es. dopo refresh post-salvataggio)
-      if (prev) sel.value = prev;
+      fillSelectWithNew('articolo', items, '➕ Aggiungi nuovo articolo…', true);
     }
 
     function onArticoloChange() {
@@ -843,13 +834,13 @@
       input.value = '';
     }
 
-    function compressPhoto(file) {
+    /* Carica un file immagine su un canvas, ridimensionandolo se supera max px sul lato lungo. */
+    function loadScaledCanvas(file, max) {
       return new Promise(function (resolve, reject) {
         var url = URL.createObjectURL(file);
         var img = new Image();
         img.onload = function () {
           var w = img.naturalWidth, h = img.naturalHeight;
-          var max = 1200;
           if (w > max || h > max) {
             var s = Math.min(max / w, max / h);
             w = Math.round(w * s); h = Math.round(h * s);
@@ -858,10 +849,16 @@
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           URL.revokeObjectURL(url);
-          resolve(canvas.toDataURL('image/jpeg', 0.75));
+          resolve(canvas);
         };
-        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Foto non leggibile')); };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Immagine non leggibile')); };
         img.src = url;
+      });
+    }
+
+    function compressPhoto(file) {
+      return loadScaledCanvas(file, 1200).then(function (canvas) {
+        return canvas.toDataURL('image/jpeg', 0.75);
       });
     }
 
@@ -1032,25 +1029,7 @@
 
     /* ============ Decodifica immagine ============ */
     function fileToCanvas(file) {
-      return new Promise(function (resolve, reject) {
-        var url = URL.createObjectURL(file);
-        var img = new Image();
-        img.onload = function () {
-          var w = img.naturalWidth, h = img.naturalHeight;
-          var max = 2560;
-          if (w > max || h > max) {
-            var s = Math.min(max / w, max / h);
-            w = Math.round(w * s); h = Math.round(h * s);
-          }
-          var canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          resolve(canvas);
-        };
-        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Immagine non leggibile')); };
-        img.src = url;
-      });
+      return loadScaledCanvas(file, 2560);
     }
 
     function rotateCanvas(src, deg) {
