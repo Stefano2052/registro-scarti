@@ -9,7 +9,7 @@
  *   SpreadsheetApp.openById, quindi servono gli scope completi.
  * - Scope richiesti:
  *   - spreadsheets
- *   - drive
+ *   - drive.file (accesso ai soli file creati dall'app)
  */
 
 var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
@@ -18,13 +18,29 @@ var SHEET_CAUSALI = 'Causali';
 
 var STABILIMENTI = ['BB1', 'BB3', 'Ipiemme', 'Zenobi'];
 
-// Cartella Drive pubblica in visualizzazione per le foto.
-var DRIVE_FOLDER_ID = '1Egj9UbdtXqtxy0abPhmAUKpqcn74HvUA';
+// Cartella Drive per le foto, creata e gestita dall'app stessa.
+// Con lo scope drive.file l'app può accedere solo ai file che crea, quindi
+// non si può usare una cartella preesistente: la creiamo al primo upload e
+// ne memorizziamo l'ID nelle proprietà dello script.
+var DRIVE_FOLDER_NAME = 'Registro Scarti - Foto';
 
 /* ============================ DRIVE FOTO ============================ */
 
 function getDriveFolder_() {
-  return DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('FOTO_FOLDER_ID');
+
+  if (id) {
+    try {
+      return DriveApp.getFolderById(id);
+    } catch (e) {
+      // Cartella rimossa o non più accessibile: la ricreo sotto.
+    }
+  }
+
+  var folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  props.setProperty('FOTO_FOLDER_ID', folder.getId());
+  return folder;
 }
 
 function uploadFotos_(fotos) {
@@ -49,8 +65,8 @@ function uploadFotos_(fotos) {
 
       var file = folder.createFile(blob);
 
-      // La cartella è già pubblica in visualizzazione.
-      // Questa riga rende comunque visibile anche il singolo file via link.
+      // Rende il singolo file visibile a chiunque abbia il link, così le
+      // foto restano apribili dai link salvati nel foglio.
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
       urls.push(file.getUrl());
