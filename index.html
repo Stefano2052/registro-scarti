@@ -1013,10 +1013,10 @@
 
     function handleScannedCode(raw) {
       var code = (raw || '').toString().trim();
-      var idx = code.indexOf('/');
+      var idx = code.search(/[/\\]/);
       if (idx <= 0 || idx >= code.length - 1) {
         toast('Codice non riconosciuto — riprova', 'warning');
-        setDebug('Letto "' + code + '" ma manca il separatore "/"', 'warn');
+        setDebug('Letto "' + code + '" ma manca il separatore "/" o "\\"', 'warn');
         return false;
       }
       var articolo = code.slice(0, idx).trim();
