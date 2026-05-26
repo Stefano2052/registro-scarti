@@ -127,6 +127,16 @@ function doGet(e) {
       );
     }
 
+    if (action === 'storico') {
+      return json_(
+        getStorico(
+          e.parameter.stabilimento || '',
+          e.parameter.operatore || '',
+          Number(e.parameter.limit)
+        )
+      );
+    }
+
     return json_({ error: 'Azione non valida' });
   } catch (err) {
     return json_({ error: getErrorMessage_(err) });
@@ -311,6 +321,60 @@ function getKpiPareto(startMs, endMs, stabilimento) {
     rows: rows,
     total: total
   };
+}
+
+// Storico delle registrazioni ordinate dalla più recente, con filtro
+// opzionale per stabilimento e operatore. Il limite cappa quante righe
+// tornano al client (il front-end ne mostra poi 5 per volta).
+function getStorico(stabilimento, operatore, limit) {
+  var sheet = ss_().getSheetByName(SHEET_DATI);
+  if (!sheet) throw new Error('Foglio "' + SHEET_DATI + '" non trovato.');
+
+  var last = sheet.getLastRow();
+  if (last < 2) return { rows: [] };
+
+  var filtroStab = String(stabilimento || '').trim();
+  var filtroOp = String(operatore || '').trim();
+
+  var values = sheet.getRange(2, 1, last - 1, 8).getValues();
+  var siglaMap = getCausaliSigla_();
+  var rows = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var d = values[i][0];
+    if (!(d instanceof Date)) continue;
+
+    var stab = String(values[i][1] || '').trim();
+    if (filtroStab && stab !== filtroStab) continue;
+
+    var op = String(values[i][7] || '').trim();
+    if (filtroOp && op !== filtroOp) continue;
+
+    var causale = String(values[i][6] || '').trim();
+
+    rows.push({
+      data: d.getTime(),
+      stabilimento: stab,
+      articolo: String(values[i][2] || '').trim(),
+      variante: String(values[i][3] || '').trim(),
+      descrizione: String(values[i][4] || '').trim(),
+      quantita: Number(values[i][5]) || 0,
+      causale: causale,
+      sigla: siglaMap[causale] || causale,
+      operatore: op
+    });
+  }
+
+  rows.sort(function (a, b) {
+    return b.data - a.data;
+  });
+
+  var lim = Number(limit);
+  if (isFinite(lim) && lim > 0 && rows.length > lim) {
+    rows = rows.slice(0, lim);
+  }
+
+  return { rows: rows };
 }
 
 /* ============================ DIAGNOSTICA ============================ */

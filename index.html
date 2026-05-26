@@ -366,6 +366,43 @@
     .empty-state[hidden] { display: none; }
     .empty-state.error { color: var(--error-text); }
 
+    /* ===== Storico registrazioni ===== */
+    /* Menu filtro con molti operatori/stabilimenti: scroll interno. */
+    #storicoStabMenu, #storicoOpMenu, #stabMenu { max-height: 50vh; overflow-y: auto; }
+
+    .storico-item {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      background: var(--surface);
+    }
+    .storico-item:last-child { margin-bottom: 0; }
+    .storico-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .storico-date { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+    .storico-qty {
+      font-size: 13px; font-weight: 800; color: var(--primary-dark);
+      background: var(--selected-bg); border-radius: 999px;
+      padding: 2px 10px; white-space: nowrap;
+    }
+    .storico-desc {
+      font-size: 15px; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 8px; word-break: break-word;
+    }
+    .storico-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    .storico-tag {
+      font-size: 11px; font-weight: 700; color: var(--text-secondary);
+      background: var(--section-bg); border: 1px solid var(--border);
+      border-radius: 999px; padding: 3px 10px;
+    }
+    .storico-tag.causale { color: var(--success-text); background: var(--success-bg); border-color: var(--primary); }
+
     /* ===== Toast ===== */
     .toast {
       position: fixed;
@@ -488,6 +525,7 @@
   <div class="container">
     <div class="nav-tabs">
       <button class="nav-tab active" id="tabRegistraBtn" onclick="switchTab('registra')">Registra</button>
+      <button class="nav-tab" id="tabStoricoBtn" onclick="switchTab('storico')">Storico</button>
       <button class="nav-tab" id="tabKpiBtn" onclick="switchTab('kpi')">KPI</button>
     </div>
 
@@ -581,6 +619,45 @@
 
         <button class="btn-primary" id="btnSalva" onclick="salva()">Salva scarto</button>
         <button class="btn-reset" id="btnReset" onclick="resetForm()">Pulisci</button>
+      </div>
+    </section>
+
+    <!-- ===== Panel Storico ===== -->
+    <section class="panel" id="panelStorico" hidden>
+      <div class="page-title">Storico registrazioni</div>
+      <div class="card">
+
+        <div class="kpi-filters">
+          <div class="period-wrap">
+            <button class="period-btn" id="storicoStabBtn" onclick="toggleStoricoStabMenu()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>
+              </svg>
+              <span id="storicoStabLabel">Tutti gli stabilimenti</span>
+              <span class="caret">▾</span>
+            </button>
+            <div class="period-menu" id="storicoStabMenu" hidden>
+              <button data-stab="" class="sel" onclick="selectStoricoStab('')">Tutti gli stabilimenti</button>
+            </div>
+          </div>
+
+          <div class="period-wrap">
+            <button class="period-btn" id="storicoOpBtn" onclick="toggleStoricoOpMenu()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <span id="storicoOpLabel">Tutti gli operatori</span>
+              <span class="caret">▾</span>
+            </button>
+            <div class="period-menu align-right" id="storicoOpMenu" hidden>
+              <button data-op="" class="sel" onclick="selectStoricoOp('')">Tutti gli operatori</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="storicoList"></div>
+        <button class="btn-reset" id="storicoMoreBtn" onclick="showMoreStorico()" hidden>Mostra altri</button>
+        <div class="empty-state" id="storicoEmpty">Caricamento…</div>
       </div>
     </section>
 
@@ -733,13 +810,16 @@
 
     /* ============ Tab ============ */
     var kpiLoadedOnce = false;
+    var storicoLoadedOnce = false;
     function switchTab(name) {
-      var isReg = name === 'registra';
-      el('tabRegistraBtn').classList.toggle('active', isReg);
-      el('tabKpiBtn').classList.toggle('active', !isReg);
-      el('panelRegistra').hidden = !isReg;
-      el('panelKpi').hidden = isReg;
-      if (!isReg && !kpiLoadedOnce) { kpiLoadedOnce = true; loadKpi(); }
+      el('tabRegistraBtn').classList.toggle('active', name === 'registra');
+      el('tabStoricoBtn').classList.toggle('active', name === 'storico');
+      el('tabKpiBtn').classList.toggle('active', name === 'kpi');
+      el('panelRegistra').hidden = name !== 'registra';
+      el('panelStorico').hidden = name !== 'storico';
+      el('panelKpi').hidden = name !== 'kpi';
+      if (name === 'kpi' && !kpiLoadedOnce) { kpiLoadedOnce = true; loadKpi(); }
+      if (name === 'storico' && !storicoLoadedOnce) { storicoLoadedOnce = true; loadStorico(); }
     }
 
     /* ============ Init dati ============ */
@@ -748,6 +828,7 @@
         hideInitError();
         fillSelect('stabilimento', data.stabilimenti);
         fillStabFilter(data.stabilimenti);
+        fillStoricoFilters(data.stabilimenti, data.operatori);
         fillSelect('causale', data.causali);
         fillArticoli(data.articoli);
         fillOperatori(data.operatori);
@@ -903,10 +984,12 @@
         showSuccess();
         resetForm();
         kpiLoadedOnce = false; // forza ricalcolo KPI al prossimo accesso
+        storicoLoadedOnce = false; // forza ricarico storico al prossimo accesso
         return apiGet({ action: 'init' });
       }).then(function (data) {
         if (data && data.operatori) fillOperatori(data.operatori);
         if (data && data.articoli) fillArticoli(data.articoli);
+        if (data && data.stabilimenti) fillStoricoFilters(data.stabilimenti, data.operatori);
       }).catch(function (err) {
         toast((err && err.message) || 'Errore durante il salvataggio', 'error');
       }).finally(function () {
@@ -1260,11 +1343,17 @@
       var m = el('periodMenu');
       m.hidden = !m.hidden;
     }
+    function closeMenuIfOutside(btnId, menuId, e) {
+      var btn = el(btnId);
+      if (!btn) return;
+      var wrap = btn.closest('.period-wrap');
+      if (wrap && !wrap.contains(e.target)) el(menuId).hidden = true;
+    }
     document.addEventListener('click', function (e) {
-      var pWrap = el('periodBtn').closest('.period-wrap');
-      if (pWrap && !pWrap.contains(e.target)) el('periodMenu').hidden = true;
-      var sWrap = el('stabFilterBtn').closest('.period-wrap');
-      if (sWrap && !sWrap.contains(e.target)) el('stabMenu').hidden = true;
+      closeMenuIfOutside('periodBtn', 'periodMenu', e);
+      closeMenuIfOutside('stabFilterBtn', 'stabMenu', e);
+      closeMenuIfOutside('storicoStabBtn', 'storicoStabMenu', e);
+      closeMenuIfOutside('storicoOpBtn', 'storicoOpMenu', e);
     });
 
     /* Filtro stabilimento KPI: stessa logica grafica del filtro periodo. */
@@ -1428,6 +1517,170 @@
           }
         }
       });
+    }
+
+    /* ============ Storico registrazioni ============ */
+    var storicoRows = [];
+    var storicoStab = '';
+    var storicoOp = '';
+    var storicoShown = 0;
+    var STORICO_PAGE = 5;          // mostra 5 alla volta
+    var STORICO_LIMIT = 200;       // righe massime scaricate dal server
+
+    /* Popola i menu filtro (stabilimento + operatore) con la stessa grafica
+       del filtro KPI, ripristinando l'eventuale selezione corrente. */
+    function fillStoricoFilters(stabilimenti, operatori) {
+      var sm = el('storicoStabMenu');
+      sm.querySelectorAll('button[data-stab]:not([data-stab=""])').forEach(function (b) { b.remove(); });
+      (stabilimenti || []).forEach(function (s) {
+        var b = document.createElement('button');
+        b.setAttribute('data-stab', s);
+        b.textContent = s;
+        b.onclick = function () { selectStoricoStab(s); };
+        sm.appendChild(b);
+      });
+
+      var om = el('storicoOpMenu');
+      om.querySelectorAll('button[data-op]:not([data-op=""])').forEach(function (b) { b.remove(); });
+      (operatori || []).forEach(function (o) {
+        var b = document.createElement('button');
+        b.setAttribute('data-op', o);
+        b.textContent = o;
+        b.onclick = function () { selectStoricoOp(o); };
+        om.appendChild(b);
+      });
+
+      markMenuSel('storicoStabMenu', 'data-stab', storicoStab);
+      markMenuSel('storicoOpMenu', 'data-op', storicoOp);
+    }
+
+    function markMenuSel(menuId, attr, value) {
+      el(menuId).querySelectorAll('button[' + attr + ']').forEach(function (b) {
+        b.classList.toggle('sel', b.getAttribute(attr) === value);
+      });
+    }
+
+    function toggleStoricoStabMenu() { var m = el('storicoStabMenu'); m.hidden = !m.hidden; }
+    function toggleStoricoOpMenu() { var m = el('storicoOpMenu'); m.hidden = !m.hidden; }
+
+    function selectStoricoStab(s) {
+      storicoStab = s;
+      el('storicoStabLabel').textContent = s || 'Tutti gli stabilimenti';
+      markMenuSel('storicoStabMenu', 'data-stab', s);
+      el('storicoStabMenu').hidden = true;
+      loadStorico();
+    }
+
+    function selectStoricoOp(o) {
+      storicoOp = o;
+      el('storicoOpLabel').textContent = o || 'Tutti gli operatori';
+      markMenuSel('storicoOpMenu', 'data-op', o);
+      el('storicoOpMenu').hidden = true;
+      loadStorico();
+    }
+
+    function loadStorico() {
+      el('storicoMoreBtn').hidden = true;
+      el('storicoList').innerHTML = '';
+      el('storicoEmpty').hidden = false;
+      el('storicoEmpty').className = 'empty-state';
+      el('storicoEmpty').textContent = 'Caricamento…';
+
+      var params = { action: 'storico', limit: STORICO_LIMIT };
+      if (storicoStab) params.stabilimento = storicoStab;
+      if (storicoOp) params.operatore = storicoOp;
+
+      apiGet(params).then(function (data) {
+        storicoRows = (data && data.rows) || [];
+        storicoShown = STORICO_PAGE;
+        renderStorico();
+      }).catch(function (e) {
+        console.error(e);
+        el('storicoEmpty').hidden = false;
+        el('storicoEmpty').className = 'empty-state error';
+        el('storicoEmpty').textContent = 'Errore nel caricamento dei dati';
+      });
+    }
+
+    function showMoreStorico() {
+      storicoShown += STORICO_PAGE;
+      renderStorico();
+    }
+
+    function renderStorico() {
+      var list = el('storicoList');
+
+      if (!storicoRows.length) {
+        list.innerHTML = '';
+        el('storicoMoreBtn').hidden = true;
+        el('storicoEmpty').hidden = false;
+        el('storicoEmpty').className = 'empty-state';
+        el('storicoEmpty').textContent = 'Nessuna registrazione trovata.';
+        return;
+      }
+
+      el('storicoEmpty').hidden = true;
+      var n = Math.min(storicoShown, storicoRows.length);
+      list.innerHTML = '';
+      for (var i = 0; i < n; i++) {
+        list.appendChild(buildStoricoItem(storicoRows[i]));
+      }
+
+      var remaining = storicoRows.length - n;
+      var moreBtn = el('storicoMoreBtn');
+      moreBtn.hidden = remaining <= 0;
+      if (remaining > 0) moreBtn.textContent = 'Mostra altri (' + remaining + ')';
+    }
+
+    function fmtDateTime(ms) {
+      var d = new Date(ms);
+      var dd = ('0' + d.getDate()).slice(-2);
+      var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+      var hh = ('0' + d.getHours()).slice(-2);
+      var mi = ('0' + d.getMinutes()).slice(-2);
+      return dd + '/' + mm + '/' + d.getFullYear() + ' ' + hh + ':' + mi;
+    }
+
+    function buildStoricoItem(r) {
+      var item = document.createElement('div');
+      item.className = 'storico-item';
+
+      var head = document.createElement('div');
+      head.className = 'storico-head';
+      var date = document.createElement('span');
+      date.className = 'storico-date';
+      date.textContent = fmtDateTime(r.data);
+      var qty = document.createElement('span');
+      qty.className = 'storico-qty';
+      qty.textContent = r.quantita + ' pz';
+      head.appendChild(date);
+      head.appendChild(qty);
+
+      var desc = document.createElement('div');
+      desc.className = 'storico-desc';
+      if (r.descrizione) {
+        desc.textContent = r.descrizione;
+      } else {
+        desc.textContent = r.articolo + (r.variante ? ' / ' + r.variante : '');
+      }
+
+      var meta = document.createElement('div');
+      meta.className = 'storico-meta';
+      if (r.causale) meta.appendChild(makeTag(r.sigla || r.causale, 'causale'));
+      if (r.stabilimento) meta.appendChild(makeTag(r.stabilimento));
+      if (r.operatore) meta.appendChild(makeTag(r.operatore));
+
+      item.appendChild(head);
+      item.appendChild(desc);
+      item.appendChild(meta);
+      return item;
+    }
+
+    function makeTag(text, extra) {
+      var t = document.createElement('span');
+      t.className = 'storico-tag' + (extra ? ' ' + extra : '');
+      t.textContent = text;
+      return t;
     }
   </script>
 </body>
