@@ -5,13 +5,11 @@
  * IMPORTANTE:
  * - Apps Script deve essere modificabile solo da te o collaboratori fidati.
  * - La web app può restare pubblica/anonima.
+ * - Progetto STANDALONE (non container-bound): accede al foglio via
+ *   SpreadsheetApp.openById, quindi servono gli scope completi.
  * - Scope richiesti:
- *   - spreadsheets.currentonly
- *   - drive.file
- */
-
-/**
- * @OnlyCurrentDoc
+ *   - spreadsheets
+ *   - drive
  */
 
 var SPREADSHEET_ID = '1KfuV1-iQcWAutqGJthjycV2aTDv1GFiT3ppYbWAE1i4';
